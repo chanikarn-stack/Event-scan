@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EventScan Pro (Multi-Event)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- QRCodeJS (สำหรับ Admin เจน QR Code) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Firebase App & Realtime Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Sarabun', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <!-- Header Bar -->
+  <header class="bg-indigo-600 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('staff')">
+        <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-xl">
+          <i class="fa-solid fa-id-card-clip"></i>
+        </div>
+        <h1 class="text-xl font-bold tracking-tight">EventScan Pro (Realtime Cloud)</h1>
+      </div>
+      
+      <div class="flex items-center space-x-2">
+        <button id="nav-btn-admin" onclick="switchTab('admin')" class="px-4 py-2 rounded-xl text-sm font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
+          <i class="fa-solid fa-calendar-plus mr-2"></i> จัดการอีเวนต์ (Admin)
+        </button>
+        <button id="nav-btn-staff" onclick="switchTab('staff')" class="px-4 py-2 rounded-xl text-sm font-semibold bg-white text-indigo-700 shadow transition flex items-center">
+          <i class="fa-solid fa-qrcode mr-2"></i> หน้าสแกนสตาฟ
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- ================= VIEW 1: STAFF SCANNER & REALTIME DASHBOARD ================= -->
+    <section id="view-staff-main" class="space-y-6">
+      
+      <!-- Top Control Bar -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">1. เลือกอีเวนต์ประจำจุด</label>
+          <select id="select-event" onchange="onEventChange()" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-indigo-700 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+            <!-- Dynamic Options -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">2. ชื่อสตาฟประจำจุดสแกน</label>
+          <input type="text" id="staff-name-input" value="สตาฟประจำจุด" onchange="saveStaffName()" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <!-- Scanner Workspace Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Camera Box -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-bold text-slate-800 flex items-center">
+                <i class="fa-solid fa-camera text-indigo-600 mr-2"></i> กล้องสแกนบาร์โค้ด
+              </h3>
+              <span id="scan-status-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600">
+                ยังไม่เปิดกล้อง
+              </span>
+            </div>
+
+            <div id="reader" class="w-full bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center text-white relative">
+              <div id="camera-placeholder" class="text-slate-400 text-center p-4">
+                <i class="fa-solid fa-video-slash text-4xl mb-2 block opacity-50"></i>
+                <p class="text-sm">กดปุ่ม "เปิดกล้องสแกน" เพื่อเริ่มทำงาน</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="grid grid-cols-2 gap-3 mt-4">
+            <button id="start-cam-btn" onclick="startScanner()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center">
+              <i class="fa-solid fa-power-off mr-2"></i> เปิดกล้องสแกน
+            </button>
+            <button id="stop-cam-btn" onclick="stopScanner()" disabled class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center opacity-50 cursor-not-allowed">
+              <i class="fa-solid fa-stop mr-2"></i> ปิดกล้อง
+            </button>
+          </div>
+        </div>
+
+        <!-- Result Display -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+          <h3 class="font-bold text-slate-800 mb-3 flex items-center">
+            <i class="fa-solid fa-circle-check text-indigo-600 mr-2"></i> ผลลัพธ์การสแกนล่าสุด
+          </h3>
+
+          <div id="result-box" class="flex-1 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center bg-slate-50/50">
+            <div id="result-empty" class="text-slate-400">
+              <i class="fa-solid fa-barcode text-5xl mb-3 block opacity-40"></i>
+              <p class="text-sm font-medium">นำบาร์โค้ดหรือ QR Code มาจ่อหน้ากล้อง</p>
+            </div>
+
+            <div id="result-data" class="hidden w-full space-y-4">
+              <div id="scan-alert-badge" class="py-2.5 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300">
+                ✅ บันทึกเข้างานสำเร็จ!
+              </div>
+
+              <div class="text-left bg-white p-4 rounded-xl border border-slate-200 text-sm space-y-2 shadow-sm">
+                <p><span class="font-semibold text-slate-400">รหัสบัตร:</span> <span id="res-barcode" class="font-extrabold text-indigo-600 text-xl block">EMP-001</span></p>
+                <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t">
+                  <p><span class="font-semibold text-slate-400">เวลาที่บันทึก:</span> <br><span id="res-timestamp" class="font-semibold text-slate-700"></span></p>
+                  <p><span class="font-semibold text-slate-400">ผู้สแกน:</span> <br><span id="res-staff" class="font-semibold text-slate-700"></span></p>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-xs font-semibold text-slate-400 text-left mb-1">ภาพถ่ายขณะสแกน:</p>
+                <img id="res-snapshot" class="w-full max-h-40 object-contain rounded-xl border bg-black shadow-inner">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Realtime Dashboard Table -->
+      <div id="dashboard-section" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <div class="flex flex-wrap justify-between items-center gap-4 border-b pb-4">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800 flex items-center">
+              <i class="fa-solid fa-list-check text-indigo-600 mr-2"></i> Dashboard รายชื่อผู้สแกนเข้างาน (Real-Time Cloud)
+            </h3>
+            <p class="text-xs text-slate-500">ซิงค์ข้อมูลสดพร้อมกันทุกอุปกรณ์ทันทีที่มีการสแกน</p>
+          </div>
+          
+          <div class="flex items-center gap-3">
+            <div class="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 flex items-center space-x-2">
+              <span class="text-xs font-semibold text-indigo-800">ผู้เข้าร่วมงานรวม:</span>
+              <span id="live-total-count" class="text-lg font-black text-indigo-600">0 คน</span>
+            </div>
+
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+              <input type="text" id="dashboard-search" onkeyup="renderDashboardTable()" placeholder="ค้นหารหัสบัตร/สตาฟ..." class="pl-8 pr-3 py-2 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 w-48">
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b">
+              <tr>
+                <th class="py-3 px-4">ลำดับ</th>
+                <th class="py-3 px-4">เวลาสแกน</th>
+                <th class="py-3 px-4">รหัสบัตร / บาร์โค้ด</th>
+                <th class="py-3 px-4">จุดสแกน / สตาฟ</th>
+                <th class="py-3 px-4 text-center">หลักฐาน Snapshot</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= VIEW 2: ADMIN MANAGEMENT ================= -->
+    <section id="view-admin-main" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+          <i class="fa-solid fa-calendar-plus text-indigo-600 mr-2"></i> สร้างอีเวนต์ใหม่ (Admin)
+        </h2>
+        <form id="create-event-form" onsubmit="handleCreateEvent(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่ออีเวนต์ / งาน</label>
+            <input type="text" id="event-name" required placeholder="เช่น สัมมนาวิชาการ 2026" class="w-full px-3 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">วันที่จัดงาน</label>
+            <input type="date" id="event-date" required class="w-full px-3 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-indigo-700 transition">
+              <i class="fa-solid fa-plus mr-1"></i> สร้างอีเวนต์
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">รายการอีเวนต์ทั้งหมด</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b">
+              <tr>
+                <th class="py-3 px-4">Event ID</th>
+                <th class="py-3 px-4">ชื่ออีเวนต์</th>
+                <th class="py-3 px-4">วันที่</th>
+                <th class="py-3 px-4">ผู้เข้าร่วม</th>
+                <th class="py-3 px-4 text-center">QR Code ประจำงาน</th>
+                <th class="py-3 px-4 text-right">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="admin-event-list-body" class="divide-y divide-slate-100">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal แสดง QR Code ประจำงาน -->
+  <div id="qr-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 hidden" onclick="closeQRModal()">
+    <div class="bg-white p-6 rounded-2xl max-w-sm w-full text-center space-y-4" onclick="event.stopPropagation()">
+      <h3 id="qr-modal-title" class="font-bold text-slate-800 text-lg">QR Code ประจำอีเวนต์</h3>
+      <p class="text-xs text-slate-500">ให้สตาฟใช้กล้องมือถือสแกน QR Code นี้เพื่อเปิดหน้าสแกนประจำงานนี้ได้ทันที</p>
+      
+      <div id="qrcode-canvas" class="flex justify-center p-4 bg-white rounded-xl border shadow-inner"></div>
+
+      <button onclick="closeQRModal()" class="w-full bg-slate-800 text-white font-semibold py-2 rounded-xl text-sm">
+        ปิดหน้าต่าง
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Config (อัปเดตข้อมูลจริงแล้ว)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMTV9lie3oWIpoMVItd5-2Lmf5O2297VM",
+      authDomain: "scan-events-5c60b.firebaseapp.com",
+      databaseURL: "https://scan-events-5c60b-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "scan-events-5c60b",
+      storageBucket: "scan-events-5c60b.firebasestorage.app",
+      messagingSenderId: "1093307444252",
+      appId: "1:1093307444252:web:28d65cf9932ec7516cc3d9",
+      measurementId: "G-L8NG6XVWPC"
+    };
+
+    // Initialize Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+
+    // Global States
+    let activeEventId = null;
+    let html5QrcodeScanner = null;
+    let isProcessing = false;
+    let eventsList = {};
+    let scanLogsList = [];
+
+    // Initialize App & Read URL Query Parameters
+    window.onload = function() {
+      const savedStaff = localStorage.getItem('staff_name');
+      if (savedStaff) document.getElementById('staff-name-input').value = savedStaff;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlEventId = urlParams.get('eventId');
+
+      db.ref('events').on('value', snapshot => {
+        eventsList = snapshot.val() || {};
+        
+        if (Object.keys(eventsList).length === 0) {
+          db.ref('events/EVT-001').set({ id: 'EVT-001', name: 'งานสัมมนาประจำปี 2026', date: '2026-03-15' });
+        }
+
+        renderEventDropdown();
+
+        if (urlEventId && eventsList[urlEventId]) {
+          activeEventId = urlEventId;
+          document.getElementById('select-event').value = activeEventId;
+          setTimeout(() => { startScanner(); }, 500);
+        } else if (!activeEventId && Object.keys(eventsList).length > 0) {
+          activeEventId = Object.keys(eventsList)[0];
+        }
+
+        listenToScanLogs();
+      });
+    };
+
+    function listenToScanLogs() {
+      if (!activeEventId) return;
+      db.ref(`scanLogs/${activeEventId}`).on('value', snapshot => {
+        const data = snapshot.val() || {};
+        scanLogsList = Object.values(data).reverse();
+        renderDashboardTable();
+      });
+    }
+
+    function switchTab(tab) {
+      if (tab === 'staff') {
+        document.getElementById('view-staff-main').classList.remove('hidden');
+        document.getElementById('view-admin-main').classList.add('hidden');
+        document.getElementById('nav-btn-staff').className = "px-4 py-2 rounded-xl text-sm font-semibold bg-white text-indigo-700 shadow transition flex items-center";
+        document.getElementById('nav-btn-admin').className = "px-4 py-2 rounded-xl text-sm font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center";
+      } else {
+        stopScanner();
+        document.getElementById('view-staff-main').classList.add('hidden');
+        document.getElementById('view-admin-main').classList.remove('hidden');
+        document.getElementById('nav-btn-admin').className = "px-4 py-2 rounded-xl text-sm font-semibold bg-white text-indigo-700 shadow transition flex items-center";
+        document.getElementById('nav-btn-staff').className = "px-4 py-2 rounded-xl text-sm font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center";
+        renderAdminPage();
+      }
+    }
+
+    function renderEventDropdown() {
+      const select = document.getElementById('select-event');
+      select.innerHTML = '';
+      Object.values(eventsList).forEach(evt => {
+        const option = document.createElement('option');
+        option.value = evt.id;
+        option.innerText = `${evt.name} (${evt.id})`;
+        if (evt.id === activeEventId) option.selected = true;
+        select.appendChild(option);
+      });
+    }
+
+    function onEventChange() {
+      activeEventId = document.getElementById('select-event').value;
+      listenToScanLogs();
+    }
+
+    function saveStaffName() {
+      const staffName = document.getElementById('staff-name-input').value;
+      localStorage.setItem('staff_name', staffName);
+    }
+
+    // --- SCANNER FUNCTIONS ---
+    function startScanner() {
+      if (!activeEventId) {
+        alert('กรุณาเลือกอีเวนต์ก่อนเปิดกล้อง');
+        return;
+      }
+
+      document.getElementById('camera-placeholder').classList.add('hidden');
+      document.getElementById('start-cam-btn').disabled = true;
+      document.getElementById('start-cam-btn').classList.add('opacity-50', 'cursor-not-allowed');
+      document.getElementById('stop-cam-btn').disabled = false;
+      document.getElementById('stop-cam-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+
+      const badge = document.getElementById('scan-status-badge');
+      badge.innerText = 'กำลังสแกน...';
+      badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 animate-pulse';
+
+      html5QrcodeScanner = new Html5Qrcode("reader");
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 160 } },
+        onCardScanned,
+        () => {}
+      ).catch(err => {
+        alert("ไม่สามารถเปิดกล้องได้: " + err);
+        stopScanner();
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+          html5QrcodeScanner.clear();
+          html5QrcodeScanner = null;
+        }).catch(() => {});
+      }
+
+      document.getElementById('camera-placeholder').classList.remove('hidden');
+      document.getElementById('start-cam-btn').disabled = false;
+      document.getElementById('start-cam-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+      document.getElementById('stop-cam-btn').disabled = true;
+      document.getElementById('stop-cam-btn').classList.add('opacity-50', 'cursor-not-allowed');
+
+      const badge = document.getElementById('scan-status-badge');
+      badge.innerText = 'ปิดกล้องแล้ว';
+      badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600';
+    }
+
+    function onCardScanned(barcodeText) {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      const staffName = document.getElementById('staff-name-input').value || 'สตาฟประจำจุด';
+      const alreadyScanned = scanLogsList.find(l => l.barcode === barcodeText);
+
+      let snapshotBase64 = '';
+      try {
+        const videoElem = document.querySelector("#reader video");
+        if (videoElem) {
+          const canvas = document.createElement("canvas");
+          canvas.width = videoElem.videoWidth || 640;
+          canvas.height = videoElem.videoHeight || 480;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+          snapshotBase64 = canvas.toDataURL("image/jpeg", 0.6);
+        }
+      } catch (e) {}
+
+      const timestamp = new Date().toLocaleString('th-TH');
+
+      document.getElementById('result-empty').classList.add('hidden');
+      document.getElementById('result-data').classList.remove('hidden');
+      document.getElementById('res-barcode').innerText = barcodeText;
+      document.getElementById('res-timestamp').innerText = timestamp;
+      document.getElementById('res-staff').innerText = staffName;
+      if (snapshotBase64) document.getElementById('res-snapshot').src = snapshotBase64;
+
+      const alertBadge = document.getElementById('scan-alert-badge');
+
+      if (alreadyScanned) {
+        alertBadge.className = "py-2.5 px-4 rounded-xl font-bold text-sm bg-rose-100 text-rose-800 border border-rose-300";
+        alertBadge.innerHTML = `⚠️ บัตรนี้ถูกสแกนไปแล้ว!<br><span class="text-xs font-normal">บันทึกเมื่อ: ${alreadyScanned.timestamp} โดย ${alreadyScanned.staff}</span>`;
+      } else {
+        alertBadge.className = "py-2.5 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300";
+        alertBadge.innerHTML = `✅ บันทึกเข้างานสำเร็จ!`;
+
+        const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
+        newLogRef.set({
+          barcode: barcodeText,
+          timestamp: timestamp,
+          staff: staffName,
+          snapshot: snapshotBase64
+        });
+      }
+
+      setTimeout(() => { isProcessing = false; }, 2000);
+    }
+
+    // --- DASHBOARD TABLE RENDER ---
+    function renderDashboardTable() {
+      const search = document.getElementById('dashboard-search').value.toLowerCase().trim();
+      const tbody = document.getElementById('dashboard-table-body');
+      tbody.innerHTML = '';
+
+      document.getElementById('live-total-count').innerText = `${scanLogsList.length} คน`;
+
+      let logs = [...scanLogsList];
+      if (search) {
+        logs = logs.filter(l => l.barcode.toLowerCase().includes(search) || l.staff.toLowerCase().includes(search));
+      }
+
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">ยังไม่มีรายชื่อผู้เข้างานในอีเวนต์นี้</td></tr>`;
+        return;
+      }
+
+      logs.forEach((log, index) => {
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-semibold text-slate-400">${logs.length - index}</td>
+            <td class="py-3 px-4 text-xs text-slate-500 font-medium">${log.timestamp}</td>
+            <td class="py-3 px-4 font-mono font-bold text-indigo-600">${log.barcode}</td>
+            <td class="py-3 px-4 font-semibold text-slate-700 text-xs">${log.staff}</td>
+            <td class="py-3 px-4 text-center">
+              ${log.snapshot ? `<img src="${log.snapshot}" class="w-10 h-7 object-cover rounded border mx-auto bg-black">` : '-'}
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    // --- ADMIN MANAGEMENT LOGIC ---
+    function renderAdminPage() {
+      const tbody = document.getElementById('admin-event-list-body');
+      tbody.innerHTML = '';
+
+      Object.values(eventsList).forEach(evt => {
+        db.ref(`scanLogs/${evt.id}`).once('value', snapshot => {
+          const logs = snapshot.val() || {};
+          const count = Object.keys(logs).length;
+          
+          const row = document.createElement('tr');
+          row.className = "hover:bg-slate-50";
+          row.innerHTML = `
+            <td class="py-3 px-4 font-mono font-bold text-indigo-600">${evt.id}</td>
+            <td class="py-3 px-4 font-semibold text-slate-800">${evt.name}</td>
+            <td class="py-3 px-4 text-xs text-slate-500">${evt.date}</td>
+            <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">${count} คน</span></td>
+            <td class="py-3 px-4 text-center">
+              <button onclick="showEventQR('${evt.id}', '${evt.name}')" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg font-semibold border border-indigo-200">
+                <i class="fa-solid fa-qrcode mr-1"></i> ดู QR งาน
+              </button>
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="deleteEvent('${evt.id}')" class="px-2.5 py-1 text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold border border-rose-200">
+                <i class="fa-solid fa-trash mr-1"></i> ลบ
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
+    }
+
+    function handleCreateEvent(e) {
+      e.preventDefault();
+      const name = document.getElementById('event-name').value.trim();
+      const date = document.getElementById('event-date').value;
+      const id = 'EVT-' + String(Object.keys(eventsList).length + 1).padStart(3, '0');
+
+      db.ref(`events/${id}`).set({ id, name, date }, (err) => {
+        if (!err) {
+          document.getElementById('create-event-form').reset();
+          alert(`สร้างอีเวนต์ "${name}" สำเร็จแล้ว`);
+        }
+      });
+    }
+
+    function deleteEvent(eventId) {
+      if (confirm(`แน่ใจหรือไม่ที่จะลบอีเวนต์ ${eventId}?`)) {
+        db.ref(`events/${eventId}`).remove();
+        db.ref(`scanLogs/${eventId}`).remove();
+      }
+    }
+
+    function showEventQR(eventId, eventName) {
+      document.getElementById('qr-modal-title').innerText = eventName;
+      const qrContainer = document.getElementById('qrcode-canvas');
+      qrContainer.innerHTML = '';
+
+      const currentWebUrl = window.location.href.split('?')[0];
+      const directScanUrl = `${currentWebUrl}?eventId=${eventId}`;
+
+      new QRCode(qrContainer, { text: directScanUrl, width: 200, height: 200 });
+      document.getElementById('qr-modal').classList.remove('hidden');
+    }
+
+    function closeQRModal() {
+      document.getElementById('qr-modal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
