@@ -40,7 +40,7 @@
       
       <div class="flex items-center space-x-2">
         <button onclick="showRoleSelectionModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
-          <i class="fa-solid fa-[#fa-arrows-rotate] fa-arrows-rotate mr-1.5"></i> สลับโหมดการทำงาน
+          <i class="fa-solid fa-arrows-rotate mr-1.5"></i> สลับโหมดการทำงาน
         </button>
       </div>
     </div>
@@ -474,7 +474,7 @@
       });
     }
 
-    // --- CAMERA & SCANNER FIXED LOGIC ---
+    // --- CAMERA & SCANNER LOGIC ---
     async function startScanner() {
       if (!activeEventId) {
         alert('กรุณาระบุ Event ID ก่อนเปิดกล้อง');
@@ -670,7 +670,24 @@
       XLSX.writeFile(workbook, `รายงานผู้เข้างาน_${activeEventId}.xlsx`);
     }
 
-    // --- ADMIN MANAGEMENT FIXED LOGIC ---
+    // --- ADMIN MANAGEMENT LOGIC ---
+    async function handleCreateEvent(e) {
+      e.preventDefault();
+      const name = document.getElementById('event-name').value.trim();
+      const date = document.getElementById('event-date').value;
+      const newEvtId = 'EVT-' + Math.floor(1000 + Math.random() * 9000);
+
+      await db.ref(`events/${newEvtId}`).set({
+        id: newEvtId,
+        name: name,
+        date: date
+      });
+
+      document.getElementById('create-event-form').reset();
+      renderAdminPage();
+      alert(`สร้างอีเวนต์ใหม่สำเร็จ! รหัสงาน: ${newEvtId}`);
+    }
+
     async function renderAdminPage() {
       const tbody = document.getElementById('admin-event-list-body');
       if (!tbody) return;
@@ -689,72 +706,59 @@
 
       for (const evt of eventsArray) {
         const logSnap = await db.ref(`scanLogs/${evt.id}`).once('value');
-        const logs = logSnap.val() || {};
-        const count = Object.keys(logs).length;
+        const count = logSnap.exists() ? Object.keys(logSnap.val()).length : 0;
 
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-50";
-        row.innerHTML = `
-          <td class="py-3 px-4 font-mono font-bold text-indigo-600">${evt.id}</td>
-          <td class="py-3 px-4 font-semibold text-slate-800">${evt.name}</td>
-          <td class="py-3 px-4 text-xs text-slate-500">${evt.date}</td>
-          <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">${count} คน</span></td>
-          <td class="py-3 px-4 text-center">
-            <button onclick="showEventQR('${evt.id}', '${evt.name}')" class="px-3 py-1 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg font-semibold border border-indigo-200 shadow-sm">
-              <i class="fa-solid fa-qrcode mr-1"></i> ดู QR Code
-            </button>
-          </td>
-          <td class="py-3 px-4 text-right">
-            <button onclick="deleteEvent('${evt.id}')" class="px-2.5 py-1 text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-semibold border border-rose-200">
-              <i class="fa-solid fa-trash mr-1"></i> ลบ
-            </button>
-          </td>
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-mono font-bold text-indigo-600">${evt.id}</td>
+            <td class="py-3 px-4 font-bold text-slate-800">${evt.name}</td>
+            <td class="py-3 px-4 text-slate-500 text-xs">${evt.date}</td>
+            <td class="py-3 px-4">
+              <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-full">${count} คน</span>
+            </td>
+            <td class="py-3 px-4 text-center">
+              <button onclick="showQRCode('${evt.id}', '${evt.name}')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition">
+                <i class="fa-solid fa-qrcode mr-1"></i> ดู QR Code
+              </button>
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="deleteEvent('${evt.id}')" class="text-rose-600 hover:text-rose-800 font-semibold text-xs px-2 py-1">
+                <i class="fa-solid fa-trash mr-1"></i> ลบ
+              </button>
+            </td>
+          </tr>
         `;
-        tbody.appendChild(row);
       }
     }
 
-    function handleCreateEvent(e) {
-      e.preventDefault();
-      const name = document.getElementById('event-name').value.trim();
-      const date = document.getElementById('event-date').value;
-      const id = 'EVT-' + String(Math.floor(1000 + Math.random() * 9000));
-
-      db.ref(`events/${id}`).set({ id, name, date }, (err) => {
-        if (!err) {
-          document.getElementById('create-event-form').reset();
-          alert(`สร้างอีเวนต์ "${name}" (${id}) สำเร็จแล้ว`);
-          renderAdminPage();
-        } else {
-          alert("ไม่สามารถสร้างอีเวนต์ได้: " + err);
-        }
-      });
-    }
-
-    async function deleteEvent(eventId) {
-      if (confirm(`แน่ใจหรือไม่ที่จะลบอีเวนต์ ${eventId}? ประวัติการสแกนทั้งหมดของอีเวนต์นี้จะถูกลบถาวร`)) {
-        await db.ref(`events/${eventId}`).remove();
-        await db.ref(`scanLogs/${eventId}`).remove();
-        alert(`ลบอีเวนต์ ${eventId} เรียบร้อยแล้ว`);
-        renderAdminPage();
-      }
-    }
-
-    function showEventQR(eventId, eventName) {
+    function showQRCode(eventId, eventName) {
       document.getElementById('qr-modal-title').innerText = eventName;
-      const qrContainer = document.getElementById('qrcode-canvas');
-      qrContainer.innerHTML = '';
+      const canvas = document.getElementById('qrcode-canvas');
+      canvas.innerHTML = '';
 
-      const currentWebUrl = window.location.href.split('?')[0];
-      const directScanUrl = `${currentWebUrl}?eventId=${eventId}`;
+      const staffUrl = `${window.location.origin}${window.location.pathname}?eventId=${eventId}`;
 
-      new QRCode(qrContainer, { text: directScanUrl, width: 200, height: 200 });
+      new QRCode(canvas, {
+        text: staffUrl,
+        width: 180,
+        height: 180
+      });
+
       document.getElementById('qr-modal').classList.remove('hidden');
     }
 
     function closeQRModal() {
       document.getElementById('qr-modal').classList.add('hidden');
     }
+
+    async function deleteEvent(eventId) {
+      if (confirm(`คุณต้องการลบอีเวนต์ ${eventId} และข้อมูลการสแกนทั้งหมดใช่หรือไม่?`)) {
+        await db.ref(`events/${eventId}`).remove();
+        await db.ref(`scanLogs/${eventId}`).remove();
+        renderAdminPage();
+      }
+    }
   </script>
+
 </body>
 </html>
