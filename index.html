@@ -1,342 +1,475 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจัดการอีเวนต์และสแกนบัตร</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Sarabun', Arial, sans-serif;
-        }
-        body {
-            background-color: #f4f6f9;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 24px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 12px;
-            margin-bottom: 20px;
-        }
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .btn-danger { background-color: #dc3545; color: white; }
-        .btn-success { background-color: #28a745; color: white; }
-        .btn-primary { background-color: #0d6efd; color: white; }
-        
-        .scanner-section {
-            background-color: #e8f5e9;
-            border: 1px solid #c8e6c9;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        .scanner-input {
-            width: 300px;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบจัดการอีเวนต์และวิเคราะห์การใช้งาน</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: 'Sarabun', 'Helvetica Neue', Arial, sans-serif;
+    color: #1e293b;
+    background-color: #f8fafc;
+    font-size: 10.5pt;
+    line-height: 1.6;
+  }
+  
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
 
-        .search-bar {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
+  .header {
+    background-color: #1e3a8a;
+    color: #ffffff;
+    padding: 24px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 4px solid #3b82f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 {
+    margin: 0 0 6px 0;
+    font-size: 18pt;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    margin: 0;
+    font-size: 10pt;
+    color: #93c5fd;
+  }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #f8f9fa;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .badge-success { background-color: #d4edda; color: #155724; }
-        .badge-danger { background-color: #f8d7da; color: #721c24; }
-        
-        .hidden { display: none; }
-    </style>
+  .meta-box {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .meta-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .meta-table td {
+    padding: 4px 0;
+    font-size: 9.5pt;
+  }
+  .meta-label {
+    font-weight: bold;
+    color: #475569;
+    width: 18%;
+  }
+  .meta-val {
+    color: #0f172a;
+  }
+
+  h2 {
+    font-size: 13pt;
+    color: #1e3a8a;
+    border-left: 4px solid #2563eb;
+    padding-left: 10px;
+    margin-top: 24px;
+    margin-bottom: 14px;
+  }
+
+  .issue-card {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .issue-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #0f172a;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 8pt;
+    font-weight: bold;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .badge-bug { background-color: #fee2e2; color: #991b1b; }
+  .badge-feature { background-color: #e0f2fe; color: #075985; }
+  .badge-sec { background-color: #fef3c7; color: #92400e; }
+  .badge-success { background-color: #dcfce7; color: #166534; }
+  .badge-danger { background-color: #fee2e2; color: #991b1b; }
+
+  /* Elements Form & Inputs */
+  .btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 9pt;
+    transition: background-color 0.2s;
+  }
+  .btn-danger { background-color: #dc2626; color: white; }
+  .btn-danger:hover { background-color: #b91c1c; }
+  .btn-success { background-color: #16a34a; color: white; }
+  .btn-success:hover { background-color: #15803d; }
+  .btn-primary { background-color: #2563eb; color: white; }
+  .btn-primary:hover { background-color: #1d4ed8; }
+
+  .input-text {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    margin-top: 6px;
+  }
+  .input-text:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+
+  table.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  table.summary-table th, table.summary-table td {
+    border: 1px solid #cbd5e1;
+    padding: 10px;
+    text-align: left;
+    font-size: 9.5pt;
+  }
+  table.summary-table th {
+    background-color: #1e3a8a;
+    color: #ffffff;
+    font-weight: bold;
+  }
+  table.summary-table tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+
+  .hidden { display: none !important; }
+</style>
 </head>
 <body>
 
 <div class="container">
-    <!-- หน้าจอ Login (จัดการข้อ 1) -->
-    <div id="loginPage" class="hidden" style="text-align: center; padding: 40px 0;">
-        <h2>กรุณาเข้าสู่ระบบ</h2>
-        <p>ระบบจะจำ Session การเข้าใช้งานของคุณไว้ แม้ว่าจะกด Refresh หน้าจอก็จะไม่หลุด</p>
-        <button class="btn btn-primary" onclick="login()">เข้าสู่ระบบ (Remember Session)</button>
+
+  <!-- หน้าล็อกอิน (ข้อ 1: ล็อกอินค้างไว้ ไม่หลุดเมื่อรีเฟรช) -->
+  <div id="loginView" class="hidden">
+    <div class="header">
+      <div>
+        <h1>ระบบจัดการอีเวนต์ (Event Management System)</h1>
+        <p>กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</p>
+      </div>
+    </div>
+    <div class="issue-card" style="text-align: center; padding: 40px;">
+      <h3 style="margin-top: 0;">เข้าสู่ระบบผู้ดูแล (Admin Login)</h3>
+      <p style="color: #64748b;">ระบบบันทึก Session ป้องกันการถูกบังคับกรอกรหัสใหม่เมื่อทำการ Refresh หน้าจอ</p>
+      <button class="btn btn-primary" onclick="login()" style="padding: 10px 24px; font-size: 10.5pt;">เข้าสู่ระบบ (Remember Me)</button>
+    </div>
+  </div>
+
+  <!-- หน้าแดชบอร์ดหลัก -->
+  <div id="dashboardView" class="hidden">
+    
+    <div class="header">
+      <div>
+        <h1>เอกสารระบบและแดชบอร์ดการทำงานจริง</h1>
+        <p>ระบบจัดการอีเวนต์ ตรวจสอบการสแกนบัตร และออกรายงานจบงาน</p>
+      </div>
+      <div>
+        <button class="btn btn-danger" onclick="logout()">ออกจากระบบ</button>
+      </div>
     </div>
 
-    <!-- หน้าจอหลัก Dashboard -->
-    <div id="mainDashboard" class="hidden">
-        <div class="header">
-            <h2>Dashboard จัดการอีเวนต์</h2>
-            <div>
-                <span id="userInfo"></span>
-                <button class="btn btn-danger" onclick="logout()" style="margin-left: 10px;">ออกจากระบบ</button>
-            </div>
-        </div>
-
-        <!-- ข้อ 3: ส่วนระบบรับค่าสแกนบัตร (Auto-Focus) -->
-        <div class="scanner-section">
-            <label for="scannerInput"><strong>[ระบบสแกนบัตรอัตโนมัติ]: </strong></label>
-            <input type="text" id="scannerInput" class="scanner-input" placeholder="ยิงบาร์โค้ด / RFID แล้วกด Enter..." autocomplete="off">
-            <small style="color: #555; margin-left: 10px;">(ช่องนี้โฟกัสตัวเองตลอดเวลา พร้อมรับสัญญาณสแกนได้ทันที)</small>
-        </div>
-
-        <!-- ข้อ 2: รายการอีเวนต์ (ลบแล้วอัพเดต UI ทันที) -->
-        <h3>รายการอีเวนต์ทั้งหมด</h3>
-        <ul id="eventList"></ul>
-
-        <hr style="margin: 30px 0;">
-
-        <!-- ข้อ 4 และ ข้อ 5: ค้นหารายชื่อ และ ปุ่ม Export CSV -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3>ตรวจสอบรายชื่อผู้เข้าร่วมงาน</h3>
-            <!-- ปุ่ม ข้อ 5 -->
-            <button class="btn btn-success" onclick="exportToCSV()">📥 ส่งออกข้อมูลจบงาน (Export CSV)</button>
-        </div>
-
-        <!-- ช่องค้นหา ข้อ 4 -->
-        <input type="text" id="searchInput" class="search-bar" placeholder="ค้นหาชื่อ นามสกุล หรือ รหัสบัตร..." oninput="renderAttendees()">
-
-        <!-- ตารางแสดงสถานะการสแกน ข้อ 4 -->
-        <table>
-            <thead>
-                <tr>
-                    <th>รหัสบัตร</th>
-                    <th>ชื่อ-นามสกุล</th>
-                    <th>สถานะการสแกน</th>
-                    <th>เวลาสแกนเข้างาน</th>
-                </tr>
-            </thead>
-            <tbody id="attendeeTableBody"></tbody>
-        </table>
+    <div class="meta-box">
+      <table class="meta-table">
+        <tr>
+          <td class="meta-label">สถานะระบบ:</td>
+          <td class="meta-val"><span class="badge badge-success">Online / Session Active</span></td>
+          <td class="meta-label">ผู้ใช้งานปัจจุบัน:</td>
+          <td class="meta-val" id="userDisplay">Admin User</td>
+        </tr>
+      </table>
     </div>
+
+    <!-- ข้อ 3: ระบบแสกนบัตร (Auto-Focus Scanner) -->
+    <div class="issue-card" style="border-left: 4px solid #16a34a; background-color: #f0fdf4;">
+      <span class="issue-title" style="color: #166534;">
+        3. ระบบสแกนบัตรเข้างานอัตโนมัติ (Scanner Interface)
+        <span class="badge badge-bug">Critical Bug Fixed</span>
+      </span>
+      <p style="margin: 4px 0 8px 0; font-size: 9pt; color: #15803d;">
+        ระบบจะบังคับ Focus ช่องรับค่าอัตโนมัติตลอดเวลา พร้อมรับข้อมูลจากเครื่องสแกน Barcode/RFID/QR Code ได้ทันที
+      </p>
+      <input type="text" id="scannerInput" class="input-text" placeholder="ยิงบาร์โค้ด / RFID แล้วกด Enter..." autocomplete="off">
+    </div>
+
+    <h2>รายการอีเวนต์ทั้งหมด (Event List)</h2>
+    
+    <!-- ข้อ 2: ลบรายการอีเวนต์แล้ว อัพเดต UI ทันที -->
+    <div class="issue-card">
+      <span class="issue-title">
+        2. จัดการรายการอีเวนต์ในระบบ
+        <span class="badge badge-bug">Bug Fixed (Instant Refresh)</span>
+      </span>
+      <table class="summary-table" style="margin-bottom: 0;">
+        <thead>
+          <tr>
+            <th style="width: 10%;">ID</th>
+            <th>ชื่ออีเวนต์</th>
+            <th style="width: 20%;">วันที่จัดงาน</th>
+            <th style="width: 15%;">การจัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="eventTableBody">
+          <!-- อีเวนต์จะถูกเรนเดอร์ผ่าน JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+      <h2>ตรวจสอบสถานะรายชื่อการเข้างาน (Dashboard Scan)</h2>
+      <!-- ข้อ 5: ปุ่ม Export CSV เมื่อจบงาน -->
+      <button class="btn btn-success" onclick="exportToCSV()" style="font-size: 10pt; padding: 8px 16px;">
+        📥 5. ส่งออกไฟล์ข้อมูลจบงาน (Export CSV)
+      </button>
+    </div>
+
+    <!-- ข้อ 4: ช่องค้นหารายชื่อในหน้า Dashboard -->
+    <div class="issue-card">
+      <span class="issue-title">
+        4. ค้นหารายชื่อผู้เข้าร่วมงาน
+        <span class="badge badge-feature">Feature Added</span>
+      </span>
+      <input type="text" id="searchInput" class="input-text" placeholder="พิมพ์ชื่อ, นามสกุล หรือ รหัสบัตร เพื่อค้นหา..." oninput="renderAttendees()">
+      
+      <table class="summary-table" style="margin-top: 15px; margin-bottom: 0;">
+        <thead>
+          <tr>
+            <th style="width: 15%;">รหัสบัตร</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th style="width: 25%;">สถานะการสแกน</th>
+            <th style="width: 20%;">เวลาที่สแกน</th>
+          </tr>
+        </thead>
+        <tbody id="attendeeTableBody">
+          <!-- รายชื่อจะถูกเรนเดอร์ผ่าน JS -->
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
 </div>
 
 <script>
-    // Mock Data เริ่มต้น
-    let events = [
-        { id: 1, name: "งานสัมมนาเทคโนโลยีประจำปี 2026", date: "2026-09-10" },
-        { id: 2, name: "อบรมเชิงปฏิบัติการพัฒนาซอฟต์แวร์", date: "2026-09-15" }
-    ];
+  // ข้อมูลจำลอง (Mock Data)
+  let events = [
+    { id: 1, name: 'งานสัมมนาเทคโนโลยีประจำปี 2026', date: '2026-09-10' },
+    { id: 2, name: 'อบรมเชิงปฏิบัติการพัฒนาซอฟต์แวร์', date: '2026-09-15' }
+  ];
 
-    let attendees = [
-        { id: 101, ticketCode: "T1001", name: "สมชาย ใจดี", isCheckedIn: true, checkInTime: "09:15:20" },
-        { id: 102, ticketCode: "T1002", name: "วิภาดา รักสวย", isCheckedIn: false, checkInTime: null },
-        { id: 103, ticketCode: "T1003", name: "อนันต์ สุขใจ", isCheckedIn: false, checkInTime: null },
-        { id: 104, ticketCode: "T1004", name: "กนกวรรณ มีทรัพย์", isCheckedIn: false, checkInTime: null }
-    ];
+  let attendees = [
+    { id: 101, ticketCode: "T1001", name: "สมชาย ใจดี", isCheckedIn: true, checkInTime: "09:15:20" },
+    { id: 102, ticketCode: "T1002", name: "วิภาดา รักสวย", isCheckedIn: false, checkInTime: null },
+    { id: 103, ticketCode: "T1003", name: "อนันต์ สุขใจ", isCheckedIn: false, checkInTime: null },
+    { id: 104, ticketCode: "T1004", name: "กนกวรรณ มีทรัพย์", isCheckedIn: false, checkInTime: null }
+  ];
 
-    // ==========================================
-    // ข้อ 1: แก้ปัญหารีเฟรชแล้วถูกบังคับล็อกอินใหม่
-    // ==========================================
-    function checkAuth() {
-        const token = localStorage.getItem('authToken');
-        const username = localStorage.getItem('username');
+  // ==========================================
+  // 1. แก้ปัญหารีเฟรชหน้าจอแล้วหลุดล็อกอิน
+  // ==========================================
+  function checkAuth() {
+    const token = localStorage.getItem('authToken');
+    const user = localStorage.getItem('userData');
 
-        if (token && username) {
-            document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('mainDashboard').classList.remove('hidden');
-            document.getElementById('userInfo').innerText = `ผู้ใช้งาน: ${username}`;
-            initDashboard();
-        } else {
-            document.getElementById('loginPage').classList.remove('hidden');
-            document.getElementById('mainDashboard').classList.add('hidden');
-        }
+    if (token && user) {
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('dashboardView').classList.remove('hidden');
+      document.getElementById('userDisplay').innerText = JSON.parse(user).name;
+      initDashboard();
+    } else {
+      document.getElementById('loginView').classList.remove('hidden');
+      document.getElementById('dashboardView').classList.add('hidden');
     }
+  }
 
-    function login() {
-        // บันทึก Token ลงใน localStorage
-        localStorage.setItem('authToken', 'sample_token_12345');
-        localStorage.setItem('username', 'Admin User');
-        checkAuth();
-    }
-
-    function logout() {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('username');
-        checkAuth();
-    }
-
-    function initDashboard() {
-        renderEvents();
-        renderAttendees();
-        setupAutoScanner();
-    }
-
-    // ==========================================
-    // ข้อ 2: ลบอีเวนต์แล้วอัพเดตหน้าจอทันที
-    // ==========================================
-    function renderEvents() {
-        const listElement = document.getElementById('eventList');
-        listElement.innerHTML = '';
-        
-        events.forEach(event => {
-            const li = document.createElement('li');
-            li.style.marginBottom = '8px';
-            li.innerHTML = `
-                ${event.name} (${event.date})
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 12px; margin-left: 10px;" onclick="deleteEvent(${event.id})">ลบ</button>
-            `;
-            listElement.appendChild(li);
-        });
-    }
-
-    function deleteEvent(id) {
-        // กรองรายการที่ต้องการลบออกจาก Array ทันที
-        events = events.filter(e => e.id !== id);
-        // แสดงผลใหม่ทันทีโดยไม่ต้องรีโหลดหน้า
-        renderEvents();
-    }
-
-    // ==========================================
-    // ข้อ 3: ระบบสแกนบัตรอัตโนมัติ (Auto-Focus)
-    // ==========================================
-    function setupAutoScanner() {
-        const scannerInput = document.getElementById('scannerInput');
-        
-        // บังคับโฟกัสกลับมาที่ช่องสแกนตลอดเวลาเมื่อผู้ใช้กดคลิกตรงไหนก็ตาม
-        window.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'INPUT') {
-                scannerInput.focus();
-            }
-        });
-        
-        scannerInput.focus();
-
-        // รับค่าเมื่อเครื่องยิงบัตรส่งค่า Enter
-        scannerInput.onkeydown = function(e) {
-            if (e.key === 'Enter') {
-                const scannedCode = this.value.trim();
-                this.value = '';
-
-                if (!scannedCode) return;
-
-                // ค้นหาและบันทึกสถานะการสแกน
-                let found = false;
-                attendees = attendees.map(item => {
-                    if (item.ticketCode === scannedCode || item.name.includes(scannedCode)) {
-                        found = true;
-                        return {
-                            ...item,
-                            isCheckedIn: true,
-                            checkInTime: new Date().toLocaleTimeString('th-TH')
-                        };
-                    }
-                    return item;
-                });
-
-                if (found) {
-                    alert(`สแกนบัตรเรียบร้อย: ${scannedCode}`);
-                } else {
-                    alert(`ไม่พบข้อมูลบัตร: ${scannedCode}`);
-                }
-
-                renderAttendees();
-            }
-        };
-    }
-
-    // ==========================================
-    // ข้อ 4: ระบบค้นหารายชื่อและการสแกนใน Dashboard
-    // ==========================================
-    function renderAttendees() {
-        const searchText = document.getElementById('searchInput').value.toLowerCase();
-        const tbody = document.getElementById('attendeeTableBody');
-        tbody.innerHTML = '';
-
-        // กรองข้อมูลตามที่ค้นหา
-        const filtered = attendees.filter(item => 
-            item.name.toLowerCase().includes(searchText) || 
-            item.ticketCode.toLowerCase().includes(searchText)
-        );
-
-        if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888;">ไม่พบข้อมูลรายชื่อ</td></tr>`;
-            return;
-        }
-
-        filtered.forEach(item => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.ticketCode}</td>
-                <td>${item.name}</td>
-                <td>
-                    ${item.isCheckedIn 
-                        ? `<span class="badge badge-success">✓ สแกนแล้ว</span>` 
-                        : `<span class="badge badge-danger">ยังไม่ได้สแกน</span>`}
-                </td>
-                <td>${item.checkInTime || '-'}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    // ==========================================
-    // ข้อ 5: ปุ่มส่งออกข้อมูลจบงาน (Export CSV)
-    // ==========================================
-    function exportToCSV() {
-        if (!attendees.length) return;
-
-        const headers = ["ID", "รหัสบัตร", "ชื่อ-นามสกุล", "สถานะการสแกน", "เวลาสแกนเข้างาน"];
-        const rows = attendees.map(item => [
-            item.id,
-            item.ticketCode,
-            `"${item.name}"`,
-            item.isCheckedIn ? "สแกนแล้ว" : "ยังไม่ได้สแกน",
-            item.checkInTime || "-"
-        ]);
-
-        // ใส่ \uFEFF กำหนด BOM เพื่อรองรับภาษาไทยใน Microsoft Excel
-        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `สรุปข้อมูลการสแกนเข้างาน_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    // ตรวจสอบการ Login เมื่อเริ่มต้น
+  function login() {
+    localStorage.setItem('authToken', 'token_secured_xyz_123');
+    localStorage.setItem('userData', JSON.stringify({ name: 'Admin User' }));
     checkAuth();
+  }
+
+  function logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
+    checkAuth();
+  }
+
+  function initDashboard() {
+    renderEvents();
+    renderAttendees();
+    setupScanner();
+  }
+
+  // ==========================================
+  // 2. ลบรายการอีเวนต์แล้ว UI อัพเดตทันที
+  // ==========================================
+  function renderEvents() {
+    const tbody = document.getElementById('eventTableBody');
+    tbody.innerHTML = '';
+    
+    events.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.id}</td>
+        <td><strong>${item.name}</strong></td>
+        <td>${item.date}</td>
+        <td>
+          <button class="btn btn-danger" onclick="deleteEvent(${item.id})">ลบรายการ</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function deleteEvent(id) {
+    events = events.filter(e => e.id !== id);
+    renderEvents(); // อัพเดตหน้าจอทันทีโดยไม่ต้องรีโหลด
+  }
+
+  // ==========================================
+  // 3. ระบบสแกนบัตร (Auto Focus Scanner)
+  // ==========================================
+  function setupScanner() {
+    const scannerInput = document.getElementById('scannerInput');
+    
+    // บังคับ Focus ที่ช่องรับค่าตลอดเวลา
+    window.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        scannerInput.focus();
+      }
+    });
+
+    scannerInput.focus();
+
+    scannerInput.onkeydown = function(e) {
+      if (e.key === 'Enter') {
+        const code = this.value.trim();
+        this.value = '';
+
+        if (!code) return;
+
+        let found = false;
+        attendees = attendees.map(item => {
+          if (item.ticketCode === code || item.name.includes(code)) {
+            found = true;
+            return {
+              ...item,
+              isCheckedIn: true,
+              checkInTime: new Date().toLocaleTimeString('th-TH')
+            };
+          }
+          return item;
+        });
+
+        if (found) {
+          alert(`สแกนสำเร็จ: บันทึกการเข้างานของ "${code}" เรียบร้อยแล้ว`);
+        } else {
+          alert(`ไม่พบข้อมูลในระบบ: ${code}`);
+        }
+
+        renderAttendees();
+      }
+    };
+  }
+
+  // ==========================================
+  // 4. ระบบค้นหารายชื่อในหน้า Dashboard
+  // ==========================================
+  function renderAttendees() {
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const tbody = document.getElementById('attendeeTableBody');
+    tbody.innerHTML = '';
+
+    const filtered = attendees.filter(item => 
+      item.name.toLowerCase().includes(searchText) || 
+      item.ticketCode.toLowerCase().includes(searchText)
+    );
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">ไม่พบข้อมูลรายชื่อที่ตรงกับการค้นหา</td></tr>`;
+      return;
+    }
+
+    filtered.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><code>${item.ticketCode}</code></td>
+        <td><strong>${item.name}</strong></td>
+        <td>
+          ${item.isCheckedIn 
+            ? `<span class="badge badge-success">✓ สแกนแล้ว (Checked-in)</span>` 
+            : `<span class="badge badge-danger">ยังไม่ได้สแกน (Pending)</span>`}
+        </td>
+        <td>${item.checkInTime || '-'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ==========================================
+  // 5. ปุ่มส่งออกข้อมูลจบงาน (Export CSV)
+  // ==========================================
+  function exportToCSV() {
+    if (!attendees.length) return;
+
+    const headers = ["ID", "รหัสบัตร", "ชื่อ-นามสกุล", "สถานะการสแกน", "เวลาสแกนเข้างาน"];
+    const rows = attendees.map(item => [
+      item.id,
+      item.ticketCode,
+      `"${item.name}"`,
+      item.isCheckedIn ? "สแกนแล้ว" : "ยังไม่ได้สแกน",
+      item.checkInTime || "-"
+    ]);
+
+    // เติม BOM (\uFEFF) เพื่อรองรับฟอนต์ภาษาไทยใน Excel
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `สรุปรายงานการสแกน_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // เรียกทำงานครั้งแรก
+  checkAuth();
 </script>
 
 </body>
