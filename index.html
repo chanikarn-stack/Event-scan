@@ -6,8 +6,8 @@
   <title>EventScan Pro - Check-in System</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML5 QR Code / Barcode Scanner -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- HTML5 QR Code / Barcode Scanner (pinned to a known-stable version) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <!-- Tesseract.js (OCR) -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- QRCodeJS -->
@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -38,7 +38,7 @@
         </div>
         <h1 class="text-xl font-bold tracking-tight">EventScan Pro</h1>
       </div>
-      
+
       <div class="flex items-center space-x-2">
         <button onclick="showRoleSelectionModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
           <i class="fa-solid fa-arrows-rotate mr-1.5"></i> สลับโหมดการทำงาน
@@ -51,7 +51,7 @@
 
     <!-- VIEW 1: STAFF SCANNER & DASHBOARD -->
     <section id="view-staff-main" class="hidden space-y-6">
-      
+
       <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-semibold text-slate-500 mb-1">อีเวนต์ปัจจุบัน (Event ID)</label>
@@ -75,7 +75,7 @@
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+
         <!-- Camera Box -->
         <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
           <div>
@@ -152,7 +152,7 @@
             </h3>
             <p class="text-xs text-slate-500">ข้อมูลเรียลไทม์ประจำอีเวนต์นี้</p>
           </div>
-          
+
           <div class="flex items-center gap-3">
             <button onclick="exportToExcel()" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow transition flex items-center">
               <i class="fa-solid fa-file-excel mr-1.5 text-sm"></i> Export Excel
@@ -289,7 +289,7 @@
         </div>
         <h3 class="font-bold text-slate-800 text-lg">ระบุข้อมูลเข้าใช้งานสตาฟ</h3>
       </div>
-      
+
       <div class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">รหัสอีเวนต์ (Event ID)</label>
@@ -316,7 +316,7 @@
       </div>
       <h3 class="font-bold text-slate-800 text-lg">เข้าสู่โหมดแอดมิน</h3>
       <p class="text-xs text-slate-500">กรอกรหัสผ่าน PIN 4 หลัก (ค่าเริ่มต้น: 1234)</p>
-      
+
       <div>
         <input type="password" id="admin-pin-field" maxlength="4" placeholder="••••" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-center text-2xl font-bold tracking-widest outline-none focus:ring-2 focus:ring-indigo-500">
       </div>
@@ -337,7 +337,7 @@
     <div class="bg-white p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-xl" onclick="event.stopPropagation()">
       <h3 id="qr-modal-title" class="font-bold text-slate-800 text-lg">QR Code ประจำอีเวนต์</h3>
       <p class="text-xs text-slate-500">ให้สตาฟสแกน QR Code นี้เพื่อเปิดเข้าสแกนงานนี้ทันที</p>
-      
+
       <div id="qrcode-canvas" class="flex justify-center p-4 bg-white rounded-xl border shadow-inner"></div>
 
       <button onclick="closeQRModal()" class="w-full bg-slate-800 text-white font-semibold py-2 rounded-xl text-sm">
@@ -482,6 +482,18 @@
         return;
       }
 
+      // FIX: guard against double-start which throws and silently breaks the scanner
+      if (html5QrcodeScanner) {
+        try {
+          const state = html5QrcodeScanner.getState ? html5QrcodeScanner.getState() : null;
+          if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+            console.warn('Scanner already running, ignoring duplicate start.');
+            return;
+          }
+        } catch (e) { /* ignore */ }
+        await stopScanner();
+      }
+
       document.getElementById('camera-placeholder').classList.add('hidden');
       document.getElementById('start-cam-btn').disabled = true;
       document.getElementById('start-cam-btn').classList.add('opacity-50', 'cursor-not-allowed');
@@ -493,33 +505,71 @@
       badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 animate-pulse';
 
       try {
-        if (html5QrcodeScanner) {
-          await stopScanner();
-        }
-
-        html5QrcodeScanner = new Html5Qrcode("reader");
-
-        // กำหนด Format การสแกนบาร์โค้ดและ QR Code ให้ยืดหยุ่นและเสถียรยิ่งขึ้น
-        const scanConfig = { 
-          fps: 15, 
-          qrbox: { width: 280, height: 200 },
+        html5QrcodeScanner = new Html5Qrcode("reader", {
+          // FIX: explicitly list formats and use the browser's native
+          // BarcodeDetector when available - this is far more reliable
+          // for 1D barcodes (CODE_128 / CODE_39 / EAN_13 / UPC_A) than the
+          // pure-JS decoder alone.
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
             Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.UPC_A
-          ]
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.ITF
+          ],
+          verbose: false
+        });
+
+        const scanConfig = {
+          fps: 12,
+          // FIX: a wider/shorter box matches the shape of ID-card barcodes
+          // better than a near-square box.
+          qrbox: { width: 300, height: 140 },
+          aspectRatio: 1.7777778,
+          disableFlip: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        };
+
+        // FIX: request a higher-resolution back camera stream. Low-res
+        // video is the single biggest cause of failed barcode/OCR reads.
+        const cameraConfig = {
+          facingMode: "environment"
         };
 
         await html5QrcodeScanner.start(
-          { facingMode: "environment" },
+          cameraConfig,
           scanConfig,
           onCardScanned,
-          () => {} // ละเว้น error เฟรมที่ไม่มีการจับภาพ
+          (errorMessage) => {
+            // per-frame "not found" callback - intentionally quiet,
+            // but keep it available for console debugging if needed.
+          }
         );
       } catch (err) {
-        alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้งานกล้องในเบราว์เซอร์");
+        // FIX: surface the *real* browser error (permission denied, no
+        // camera found, insecure context, camera already in use, etc.)
+        // instead of a single generic message, so the failure can
+        // actually be diagnosed.
+        console.error('Camera start error:', err);
+        let msg = 'ไม่สามารถเข้าถึงกล้องได้';
+        const errStr = (err && (err.name || err.message || err.toString())) || '';
+        if (errStr.includes('NotAllowedError') || errStr.includes('Permission')) {
+          msg = 'กรุณาอนุญาตการใช้งานกล้องในเบราว์เซอร์ (ไปที่การตั้งค่าเว็บไซต์ > กล้อง)';
+        } else if (errStr.includes('NotFoundError')) {
+          msg = 'ไม่พบกล้องบนอุปกรณ์นี้';
+        } else if (errStr.includes('NotReadableError')) {
+          msg = 'กล้องถูกใช้งานโดยแอปอื่นอยู่ กรุณาปิดแอปอื่นที่ใช้กล้องแล้วลองใหม่';
+        } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+          msg = 'ต้องเปิดเว็บผ่าน HTTPS เท่านั้น กล้องจะใช้งานไม่ได้บน HTTP';
+        } else {
+          msg = 'ไม่สามารถเข้าถึงกล้องได้: ' + errStr;
+        }
+        alert(msg);
         stopScanner();
       }
     }
@@ -527,9 +577,14 @@
     async function stopScanner() {
       if (html5QrcodeScanner) {
         try {
-          await html5QrcodeScanner.stop();
+          const state = html5QrcodeScanner.getState ? html5QrcodeScanner.getState() : null;
+          if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+            await html5QrcodeScanner.stop();
+          }
           html5QrcodeScanner.clear();
-        } catch (e) {}
+        } catch (e) {
+          console.warn('stopScanner cleanup warning:', e);
+        }
         html5QrcodeScanner = null;
       }
 
@@ -549,22 +604,31 @@
       const videoElem = document.querySelector("#reader video");
       if (!videoElem) return { base64: '', processedCanvas: null };
 
-      const canvas = document.createElement("canvas");
-      canvas.width = videoElem.videoWidth || 640;
-      canvas.height = videoElem.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-      
-      // วาดภาพต้นฉบับ
-      ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-      const originalBase64 = canvas.toDataURL("image/jpeg", 0.7);
+      // ภาพต้นฉบับ (ใช้เก็บเป็นหลักฐาน)
+      const rawCanvas = document.createElement("canvas");
+      rawCanvas.width = videoElem.videoWidth || 640;
+      rawCanvas.height = videoElem.videoHeight || 480;
+      const rawCtx = rawCanvas.getContext("2d");
+      rawCtx.drawImage(videoElem, 0, 0, rawCanvas.width, rawCanvas.height);
+      const originalBase64 = rawCanvas.toDataURL("image/jpeg", 0.7);
 
-      // ปรับแต่งภาพด้วย Contrast / Grayscale ช่วยส่งเสริม OCR
+      // FIX: ขยายภาพขึ้น (upscale) ก่อนทำ OCR ช่วยให้ Tesseract อ่านตัวอักษร
+      // เล็ก ๆ บนบัตรพนักงานได้แม่นยำขึ้นมาก
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = rawCanvas.width * scale;
+      canvas.height = rawCanvas.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(rawCanvas, 0, 0, canvas.width, canvas.height);
+
+      // Grayscale + adaptive-ish contrast (simple threshold, tuned wider)
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const d = imgData.data;
       for (let i = 0; i < d.length; i += 4) {
         const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
-        // เพิ่มความคมชัดระหว่างข้อความดำและพื้นหลัง
-        const contrastVal = avg > 120 ? 255 : (avg < 80 ? 0 : avg);
+        const contrastVal = avg > 140 ? 255 : (avg < 100 ? 0 : avg);
         d[i] = contrastVal;
         d[i + 1] = contrastVal;
         d[i + 2] = contrastVal;
@@ -572,6 +636,56 @@
       ctx.putImageData(imgData, 0, 0);
 
       return { base64: originalBase64, processedCanvas: canvas };
+    }
+
+    // FIX: new helper that pulls BOTH the employee name AND the employee
+    // ID number out of the OCR text. The old code only ever looked for a
+    // name.
+    function extractCardInfo(ocrText) {
+      const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+      let name = "ไม่พบชื่อบนหน้าบัตร";
+      let empId = "";
+
+      const namePattern = /(ชื่อ|Name|คุณ|นาย|นางสาว|นาง|Mr\.|Mrs\.|Ms\.)\s*[:\-]?\s*([ก-๙a-zA-Z\s\.]+)/i;
+      // รองรับป้ายกำกับรหัสพนักงานหลายแบบ: "รหัสพนักงาน", "เลขที่บัตร",
+      // "เลขประจำตัว", "Employee ID", "ID No."
+      const idPattern = /(รหัสพนักงาน|เลขที่บัตร|เลขประจำตัว(?:พนักงาน)?|Employee\s*ID|Emp\.?\s*ID|ID\s*No\.?|ID\s*[:\-])\s*[:\-]?\s*([A-Za-z0-9\-]{3,15})/i;
+      // fallback: มองหากลุ่มตัวเลขล้วน 4-13 หลัก (เลขบัตรพนักงาน/เลขประจำตัว)
+      const bareNumberPattern = /\b(\d{4,13})\b/;
+
+      for (const line of lines) {
+        if (!empId) {
+          const idMatch = line.match(idPattern);
+          if (idMatch && idMatch[2]) {
+            empId = idMatch[2].trim();
+          }
+        }
+
+        if (name === "ไม่พบชื่อบนหน้าบัตร") {
+          const nameMatch = line.match(namePattern);
+          if (nameMatch && nameMatch[2] && nameMatch[2].trim().length > 2) {
+            name = nameMatch[2].trim();
+          } else if (line.length > 5 && /[ก-๙]/.test(line) &&
+                     !line.includes('บัตร') && !line.includes('บริษัท') &&
+                     !idPattern.test(line)) {
+            const cleaned = line.replace(/[^ก-๙a-zA-Z\s]/g, '').trim();
+            if (cleaned.length > 3) name = cleaned;
+          }
+        }
+      }
+
+      // ถ้าไม่เจอรหัสจากป้ายกำกับ ลองหาเลขล้วน ๆ ที่ยาวพอจะเป็นรหัสพนักงาน
+      if (!empId) {
+        for (const line of lines) {
+          const numMatch = line.match(bareNumberPattern);
+          if (numMatch) {
+            empId = numMatch[1];
+            break;
+          }
+        }
+      }
+
+      return { name, empId };
     }
 
     async function onCardScanned(barcodeText) {
@@ -597,7 +711,9 @@
       if (alreadyScanned) {
         alertBadge.className = "py-2 px-4 rounded-xl font-bold text-sm bg-rose-100 text-rose-800 border border-rose-300";
         alertBadge.innerHTML = `⚠️ ข้อมูลนี้ถูกสแกนไปแล้ว!<br><span class="text-xs font-normal">บันทึกเมื่อ: ${alreadyScanned.timestamp} โดย ${alreadyScanned.staff}</span>`;
-        document.getElementById('res-emp-name').innerText = alreadyScanned.empName || "ไม่ระบุชื่อ";
+        const shownName = alreadyScanned.empName || "ไม่ระบุชื่อ";
+        const shownId = alreadyScanned.empId ? ` (รหัส: ${alreadyScanned.empId})` : '';
+        document.getElementById('res-emp-name').innerText = shownName + shownId;
         setTimeout(() => { isProcessing = false; }, 2500);
         return;
       }
@@ -606,42 +722,32 @@
       alertBadge.innerHTML = `✅ บันทึกเข้างานสำเร็จ!`;
       document.getElementById('res-emp-name').innerText = "กำลังอ่านชื่อจากบัตร (OCR)...";
 
-      // OCR อ่านภาษาไทยและอังกฤษจากบัตร
+      // OCR อ่านภาษาไทยและอังกฤษจากบัตร - ดึงทั้งชื่อและรหัสพนักงาน
       let extractedName = "ไม่พบชื่อบนหน้าบัตร";
+      let extractedId = "";
       if (processedCanvas) {
         try {
           if (!tesseractWorker) {
             tesseractWorker = await Tesseract.createWorker('tha+eng');
           }
           const ret = await tesseractWorker.recognize(processedCanvas);
-          const lines = ret.data.text.split('\n');
-          
-          for (let line of lines) {
-            const cleanText = line.trim();
-            // ค้นหารูปแบบชื่อภาษาไทยและคำนำหน้านาม
-            const namePattern = /(ชื่อ|Name|คุณ|นาย|นางสาว|นาง|Mr\.|Mrs\.|Ms\.)\s*([ก-๙a-zA-Z\s]+)/i;
-            const match = cleanText.match(namePattern);
-            if (match && match[2] && match[2].trim().length > 2) {
-              extractedName = match[2].trim();
-              break;
-            } else if (cleanText.length > 5 && /[ก-๙]/.test(cleanText) && !cleanText.includes('บัตร') && !cleanText.includes('บริษัท')) {
-              // กรณีไม่พบคำนำหน้า แต่พบข้อความภาษาไทยที่มีความยาว
-              extractedName = cleanText.replace(/[^ก-๙a-zA-Z\s]/g, '').trim();
-              if (extractedName.length > 3) break;
-            }
-          }
+          const info = extractCardInfo(ret.data.text);
+          extractedName = info.name;
+          extractedId = info.empId;
         } catch (err) {
+          console.error('OCR error:', err);
           extractedName = "อ่านชื่อไม่สมบูรณ์ (ตรวจสอบภาพ Snapshot)";
         }
       }
 
-      document.getElementById('res-emp-name').innerText = extractedName;
+      document.getElementById('res-emp-name').innerText = extractedName + (extractedId ? ` (รหัส: ${extractedId})` : '');
 
       // บันทึกขึ้น Realtime Database
       const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
       await newLogRef.set({
         barcode: barcodeText,
         empName: extractedName,
+        empId: extractedId,
         timestamp: timestamp,
         staff: currentStaffName,
         snapshot: snapshotBase64
@@ -659,9 +765,10 @@
 
       let logs = [...scanLogsList];
       if (search) {
-        logs = logs.filter(l => 
-          l.barcode.toLowerCase().includes(search) || 
+        logs = logs.filter(l =>
+          l.barcode.toLowerCase().includes(search) ||
           (l.empName && l.empName.toLowerCase().includes(search)) ||
+          (l.empId && l.empId.toLowerCase().includes(search)) ||
           l.staff.toLowerCase().includes(search)
         );
       }
@@ -672,12 +779,13 @@
       }
 
       logs.forEach((log, index) => {
+        const nameCell = (log.empName || '-') + (log.empId ? ` <span class="text-slate-400 font-normal">(รหัส: ${log.empId})</span>` : '');
         tbody.innerHTML += `
           <tr class="hover:bg-slate-50">
             <td class="py-3 px-4 font-semibold text-slate-400">${logs.length - index}</td>
             <td class="py-3 px-4 text-xs text-slate-500 font-medium">${log.timestamp}</td>
             <td class="py-3 px-4 font-mono font-bold text-indigo-600 break-all">${log.barcode}</td>
-            <td class="py-3 px-4 font-bold text-slate-800">${log.empName || '-'}</td>
+            <td class="py-3 px-4 font-bold text-slate-800">${nameCell}</td>
             <td class="py-3 px-4 font-semibold text-slate-700 text-xs">${log.staff}</td>
             <td class="py-3 px-4 text-center">
               ${log.snapshot ? `<img src="${log.snapshot}" class="w-12 h-8 object-cover rounded border mx-auto bg-black shadow-sm">` : '-'}
@@ -697,6 +805,7 @@
         "ลำดับ": scanLogsList.length - i,
         "ข้อมูลที่สแกนได้": log.barcode,
         "ชื่อ-นามสกุล": log.empName || "-",
+        "รหัสพนักงาน (OCR)": log.empId || "-",
         "เวลาสแกนบันทึก": log.timestamp,
         "สตาฟผู้บันทึก": log.staff
       }));
@@ -775,7 +884,7 @@
     function viewEventDashboard(eventId) {
       activeEventId = eventId;
       if (!currentStaffName) currentStaffName = "Admin";
-      
+
       document.getElementById('staff-event-display').value = activeEventId;
       document.getElementById('staff-name-display').value = currentStaffName;
 
