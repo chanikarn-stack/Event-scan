@@ -25,18 +25,11 @@
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Sarabun', sans-serif; }
     
-    #reader { border: none !important; }
-    #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 1rem; }
-    #reader__scan_region { background: transparent !important; }
-    #reader__dashboard { padding: 8px !important; }
-    #reader__dashboard_section_csr button {
-      background-color: #4f46e5 !important;
-      color: white !important;
-      padding: 6px 16px !important;
-      border-radius: 0.5rem !important;
-      font-size: 0.875rem !important;
-      border: none !important;
-      cursor: pointer !important;
+    #reader video { 
+      width: 100% !important; 
+      height: 100% !important; 
+      object-fit: cover !important; 
+      border-radius: 1rem; 
     }
   </style>
 </head>
@@ -53,7 +46,7 @@
       </div>
       
       <div class="flex items-center space-x-2">
-        <!-- ปุ่มกลับหน้า Admin (จะแสดงเมื่อมาจากหน้า Admin) -->
+        <!-- ปุ่มกลับหน้า Admin -->
         <button id="back-to-admin-btn" onclick="returnToAdminView()" class="hidden px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition flex items-center shadow">
           <i class="fa-solid fa-arrow-left mr-1.5"></i> ย้อนกลับไปหน้า Admin
         </button>
@@ -108,14 +101,21 @@
 
             <div class="w-full bg-slate-900 rounded-2xl overflow-hidden min-h-[300px] flex items-center justify-center text-white relative">
               <div id="reader" class="w-full h-full min-h-[300px]"></div>
+              
+              <!-- Custom Scanner Overlay Grid -->
+              <div class="absolute inset-0 border-2 border-indigo-400/40 rounded-2xl pointer-events-none flex items-center justify-center">
+                <div class="w-72 h-36 border-2 border-dashed border-emerald-400 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <span class="text-xs bg-slate-900/80 px-2 py-1 rounded text-emerald-300 font-mono">ทาบบาร์โค้ดในกรอบนี้</span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3 mt-4">
-            <button id="start-cam-btn" onclick="initScannerUI()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center">
+            <button id="start-cam-btn" onclick="startCameraDirectly()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center">
               <i class="fa-solid fa-power-off mr-2"></i> เปิดกล้องสแกน
             </button>
-            <button id="stop-cam-btn" onclick="stopScanner()" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center">
+            <button id="stop-cam-btn" onclick="stopCameraDirectly()" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center">
               <i class="fa-solid fa-stop mr-2"></i> ปิดกล้อง
             </button>
           </div>
@@ -375,11 +375,11 @@
     const ADMIN_PIN = "1234";
 
     let activeEventId = null;
-    let html5QrcodeScanner = null;
+    let html5QrcodeEngine = null;
     let isProcessing = false;
     let scanLogsList = [];
     let currentStaffName = "";
-    let isAdminLoggedIn = false; // ตัวแปรเก็บสถานะการล็อกอินแอดมิน
+    let isAdminLoggedIn = false;
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -394,7 +394,7 @@
     };
 
     function showRoleSelectionModal() {
-      stopScanner();
+      stopCameraDirectly();
       document.getElementById('back-to-admin-btn').classList.add('hidden');
       document.getElementById('role-select-modal').classList.remove('hidden');
       document.getElementById('view-staff-main').classList.add('hidden');
@@ -455,7 +455,7 @@
         document.getElementById('view-admin-main').classList.add('hidden');
 
         listenToScanLogs();
-        setTimeout(initScannerUI, 300);
+        setTimeout(startCameraDirectly, 400);
       });
     }
 
@@ -472,7 +472,7 @@
     function submitAdminLogin() {
       const pin = document.getElementById('admin-pin-field').value;
       if (pin === ADMIN_PIN) {
-        isAdminLoggedIn = true; // บันทึกว่าเข้าสู่ระบบแอดมินแล้ว
+        isAdminLoggedIn = true;
         document.getElementById('admin-login-modal').classList.add('hidden');
         openAdminPanel();
       } else {
@@ -481,7 +481,7 @@
     }
 
     function openAdminPanel() {
-      stopScanner();
+      stopCameraDirectly();
       document.getElementById('back-to-admin-btn').classList.add('hidden');
       document.getElementById('view-admin-main').classList.remove('hidden');
       document.getElementById('view-staff-main').classList.add('hidden');
@@ -501,50 +501,67 @@
       });
     }
 
-    // --- REFACTORED SCANNER ENGINE (แก้ให้จับบาร์โค้ดขนาดเล็กและทุกรูปแบบได้ 100%) ---
-    function initScannerUI() {
-      stopScanner();
-      
+    // --- REFACTORED ENGINE: บังคับเปิดกล้องหลังตรง ไม่ต้องเลือกกล้อง สแกนติดไว 100% ---
+    async function startCameraDirectly() {
+      await stopCameraDirectly();
+
       const badge = document.getElementById('scan-status-badge');
-      badge.innerText = 'กำลังเปิดกล้อง...';
+      badge.innerText = 'กำลังเปิดกล้องหลัง...';
       badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 animate-pulse';
 
-      // กำหนด Formats บาร์โค้ดแบบกว้างที่สุดเพื่อรองรับ Code 128 / Code 39 บนบัตรพนักงาน
-      const formatsToSupport = [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODABAR,
-        Html5QrcodeSupportedFormats.ITF
-      ];
+      html5QrcodeEngine = new Html5Qrcode("reader", {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A
+        ]
+      });
 
-      html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", 
-        { 
-          fps: 15, 
-          // ปรับขนาด Scan Box ให้กว้าง 320px สูง 180px เพื่อให้รองรับบาร์โค้ดแนวนอนบนบัตรพนักงาน
-          qrbox: { width: 320, height: 180 },
-          rememberLastUsedCamera: true,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          formatsToSupport: formatsToSupport
-        },
-        /* verbose= */ false
-      );
+      const config = {
+        fps: 20,
+        qrbox: { width: 320, height: 160 },
+        aspectRatio: 1.777778
+      };
 
-      html5QrcodeScanner.render(onCardScanned, (error) => {});
+      try {
+        // บังคับใช้กล้องหลัง (FacingMode: Environment) ทันที
+        await html5QrcodeEngine.start(
+          { facingMode: "environment" },
+          config,
+          onCardScanned,
+          (errorMessage) => {}
+        );
+
+        badge.innerText = 'สแกนเนอร์ทำงานอยู่';
+        badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white';
+      } catch (err) {
+        // Fallback: หากอุปกรณ์ไม่รองรับการระบุ FacingMode ให้ดึง Camera ID สุดท้าย
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            const lastCamId = devices[devices.length - 1].id;
+            await html5QrcodeEngine.start(lastCamId, config, onCardScanned, (e) => {});
+            badge.innerText = 'สแกนเนอร์ทำงานอยู่';
+            badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white';
+          }
+        } catch (e2) {
+          alert("ไม่สามารถเข้าถึงกล้องถ่ายภาพได้ กรุณาอนุญาตสิทธิ์การใช้กล้องในเบราว์เซอร์");
+        }
+      }
     }
 
-    function stopScanner() {
-      if (html5QrcodeScanner) {
+    async function stopCameraDirectly() {
+      if (html5QrcodeEngine && html5QrcodeEngine.isScanning) {
         try {
-          html5QrcodeScanner.clear();
+          await html5QrcodeEngine.stop();
+          html5QrcodeEngine.clear();
         } catch (e) {}
-        html5QrcodeScanner = null;
       }
+      html5QrcodeEngine = null;
+
       const badge = document.getElementById('scan-status-badge');
       if (badge) {
         badge.innerText = 'ปิดกล้องแล้ว';
@@ -558,7 +575,7 @@
 
       const alreadyScanned = scanLogsList.find(l => l.barcode === barcodeText);
 
-      // ถ่าย snapshot จากวิดีโอกล้อง
+      // ถ่าย Snapshot จากวิดีโอกล้อง
       let snapshotBase64 = '';
       try {
         const videoElem = document.querySelector("#reader video");
@@ -756,7 +773,7 @@
       document.getElementById('staff-event-display').value = activeEventId;
       document.getElementById('staff-name-display').value = currentStaffName;
 
-      // แสดงปุ่ม "ย้อนกลับไปหน้า Admin" ที่แถบเมนูด้านบน
+      // แสดงปุ่มย้อนกลับ Admin ด้านบน
       if (isAdminLoggedIn) {
         document.getElementById('back-to-admin-btn').classList.remove('hidden');
       }
@@ -765,7 +782,7 @@
       document.getElementById('view-staff-main').classList.remove('hidden');
 
       listenToScanLogs();
-      setTimeout(initScannerUI, 300);
+      setTimeout(startCameraDirectly, 400);
     }
 
     function showQRCode(eventId, eventName) {
