@@ -25,7 +25,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Sarabun', sans-serif; }
     
-    /* ปรับแต่ง UI ของกล้องสแกนเนอร์ให้กลมกลืนกับ UI เดิม */
     #reader { border: none !important; }
     #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 1rem; }
     #reader__scan_region { background: transparent !important; }
@@ -54,6 +53,11 @@
       </div>
       
       <div class="flex items-center space-x-2">
+        <!-- ปุ่มกลับหน้า Admin (จะแสดงเมื่อมาจากหน้า Admin) -->
+        <button id="back-to-admin-btn" onclick="returnToAdminView()" class="hidden px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition flex items-center shadow">
+          <i class="fa-solid fa-arrow-left mr-1.5"></i> ย้อนกลับไปหน้า Admin
+        </button>
+
         <button onclick="showRoleSelectionModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
           <i class="fa-solid fa-arrows-rotate mr-1.5"></i> สลับโหมดการทำงาน
         </button>
@@ -375,6 +379,7 @@
     let isProcessing = false;
     let scanLogsList = [];
     let currentStaffName = "";
+    let isAdminLoggedIn = false; // ตัวแปรเก็บสถานะการล็อกอินแอดมิน
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -390,6 +395,7 @@
 
     function showRoleSelectionModal() {
       stopScanner();
+      document.getElementById('back-to-admin-btn').classList.add('hidden');
       document.getElementById('role-select-modal').classList.remove('hidden');
       document.getElementById('view-staff-main').classList.add('hidden');
       document.getElementById('view-admin-main').classList.add('hidden');
@@ -400,7 +406,11 @@
       if (role === 'staff') {
         promptStaffSetup();
       } else if (role === 'admin') {
-        showAdminLoginModal();
+        if (isAdminLoggedIn) {
+          openAdminPanel();
+        } else {
+          showAdminLoginModal();
+        }
       }
     }
 
@@ -462,13 +472,24 @@
     function submitAdminLogin() {
       const pin = document.getElementById('admin-pin-field').value;
       if (pin === ADMIN_PIN) {
+        isAdminLoggedIn = true; // บันทึกว่าเข้าสู่ระบบแอดมินแล้ว
         document.getElementById('admin-login-modal').classList.add('hidden');
-        document.getElementById('view-admin-main').classList.remove('hidden');
-        document.getElementById('view-staff-main').classList.add('hidden');
-        renderAdminPage();
+        openAdminPanel();
       } else {
         alert("รหัสผ่าน PIN ไม่ถูกต้อง!");
       }
+    }
+
+    function openAdminPanel() {
+      stopScanner();
+      document.getElementById('back-to-admin-btn').classList.add('hidden');
+      document.getElementById('view-admin-main').classList.remove('hidden');
+      document.getElementById('view-staff-main').classList.add('hidden');
+      renderAdminPage();
+    }
+
+    function returnToAdminView() {
+      openAdminPanel();
     }
 
     function listenToScanLogs() {
@@ -480,7 +501,7 @@
       });
     }
 
-    // --- REFACTORED SCANNER ENGINE (แก้ปัญหากล้องสแกนไม่ได้ 100%) ---
+    // --- REFACTORED SCANNER ENGINE (แก้ให้จับบาร์โค้ดขนาดเล็กและทุกรูปแบบได้ 100%) ---
     function initScannerUI() {
       stopScanner();
       
@@ -488,13 +509,28 @@
       badge.innerText = 'กำลังเปิดกล้อง...';
       badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 animate-pulse';
 
+      // กำหนด Formats บาร์โค้ดแบบกว้างที่สุดเพื่อรองรับ Code 128 / Code 39 บนบัตรพนักงาน
+      const formatsToSupport = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF
+      ];
+
       html5QrcodeScanner = new Html5QrcodeScanner(
         "reader", 
         { 
-          fps: 10, 
-          qrbox: { width: 250, height: 160 },
+          fps: 15, 
+          // ปรับขนาด Scan Box ให้กว้าง 320px สูง 180px เพื่อให้รองรับบาร์โค้ดแนวนอนบนบัตรพนักงาน
+          qrbox: { width: 320, height: 180 },
           rememberLastUsedCamera: true,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+          formatsToSupport: formatsToSupport
         },
         /* verbose= */ false
       );
@@ -510,8 +546,10 @@
         html5QrcodeScanner = null;
       }
       const badge = document.getElementById('scan-status-badge');
-      badge.innerText = 'ปิดกล้องแล้ว';
-      badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600';
+      if (badge) {
+        badge.innerText = 'ปิดกล้องแล้ว';
+        badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600';
+      }
     }
 
     async function onCardScanned(barcodeText) {
@@ -549,7 +587,7 @@
         alertBadge.className = "py-2 px-4 rounded-xl font-bold text-sm bg-rose-100 text-rose-800 border border-rose-300";
         alertBadge.innerHTML = `⚠️ ข้อมูลนี้ถูกสแกนไปแล้ว!<br><span class="text-xs font-normal">บันทึกเมื่อ: ${alreadyScanned.timestamp} โดย ${alreadyScanned.staff}</span>`;
         document.getElementById('res-emp-name').innerText = alreadyScanned.empName || "สแกนสำเร็จ";
-        setTimeout(() => { isProcessing = false; }, 2000);
+        setTimeout(() => { isProcessing = false; }, 2500);
         return;
       }
 
@@ -586,7 +624,7 @@
         snapshot: snapshotBase64
       });
 
-      setTimeout(() => { isProcessing = false; }, 2000);
+      setTimeout(() => { isProcessing = false; }, 2500);
     }
 
     function renderDashboardTable() {
@@ -717,6 +755,11 @@
       
       document.getElementById('staff-event-display').value = activeEventId;
       document.getElementById('staff-name-display').value = currentStaffName;
+
+      // แสดงปุ่ม "ย้อนกลับไปหน้า Admin" ที่แถบเมนูด้านบน
+      if (isAdminLoggedIn) {
+        document.getElementById('back-to-admin-btn').classList.remove('hidden');
+      }
 
       document.getElementById('view-admin-main').classList.add('hidden');
       document.getElementById('view-staff-main').classList.remove('hidden');
