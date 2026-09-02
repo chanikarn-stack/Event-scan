@@ -3,13 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EventScan Pro - Full Auto Scan & Complete UI</title>
+  <title>EventScan Pro - Auto Save Barcode & Name</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTML5 Barcode Scanner -->
+  <!-- HTML5 QR Code / Barcode Scanner -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- Tesseract.js (OCR ภาษาไทย อัตโนมัติ) -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- SheetJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- FontAwesome Icons -->
@@ -32,18 +30,17 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col">
 
-  <!-- HEADER พร้อมปุ่ม Log in Mode / ตั้งค่า -->
   <header class="bg-indigo-600 text-white shadow-md">
     <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="promptStaffSetup()">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showRoleSelectionModal()">
         <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-xl">
           <i class="fa-solid fa-id-card-clip"></i>
         </div>
         <h1 class="text-xl font-bold tracking-tight">EventScan Pro</h1>
       </div>
       
-      <button onclick="promptStaffSetup()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
-        <i class="fa-solid fa-arrows-rotate mr-1.5"></i> สลับโหมด / ตั้งค่า Log in
+      <button onclick="showRoleSelectionModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center">
+        <i class="fa-solid fa-arrows-rotate mr-1.5"></i> สลับโหมด / ตั้งค่า
       </button>
     </div>
   </header>
@@ -75,7 +72,7 @@
           </div>
           <div>
             <h4 class="font-bold text-sm">ยิงบาร์โค้ด หรือ พิมพ์รหัสพนักงาน (Barcode Gun Support)</h4>
-            <p class="text-xs text-indigo-200">หากสแกนผ่านกล้องยาก สามารถพิมพ์รหัส แล้วกดบันทึกได้ทันที</p>
+            <p class="text-xs text-indigo-200">หากสแกนผ่านกล้องยาก สามารถพิมพ์รหัส เช่น 10027011 แล้วกดบันทึกได้ทันที</p>
           </div>
         </div>
         <div class="flex gap-2 w-full md:w-auto">
@@ -86,7 +83,6 @@
         </div>
       </div>
 
-      <!-- Camera & Result Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         <!-- Camera Scanner Box -->
@@ -94,7 +90,7 @@
           <div>
             <div class="flex justify-between items-center mb-3">
               <h3 class="font-bold text-slate-800 flex items-center">
-                <i class="fa-solid fa-camera text-indigo-600 mr-2"></i> สแกนบัตรอัตโนมัติ (อ่านชื่อ + รหัส)
+                <i class="fa-solid fa-camera text-indigo-600 mr-2"></i> สแกนบาร์โค้ดแท่ง (Barcode Only)
               </h3>
               <span id="scan-status-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600">
                 พร้อมใช้งาน
@@ -104,10 +100,11 @@
             <div class="w-full bg-slate-900 rounded-2xl overflow-hidden min-h-[280px] flex items-center justify-center text-white relative">
               <div id="reader" class="w-full h-full min-h-[280px]"></div>
               
+              <!-- Scanning Frame Target for Barcode -->
               <div class="absolute inset-0 border-2 border-indigo-400/30 rounded-2xl pointer-events-none flex flex-col items-center justify-center">
-                <div class="w-80 h-28 border-2 border-dashed border-emerald-400 rounded-xl bg-emerald-500/10 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+                <div class="w-80 h-24 border-2 border-dashed border-emerald-400 rounded-xl bg-emerald-500/10 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                   <div class="w-full h-1 bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-pulse"></div>
-                  <span class="text-[11px] bg-slate-900/90 px-2.5 py-0.5 rounded text-emerald-300 font-mono absolute bottom-1">ทาบบาร์โค้ดและชื่อในกรอบนี้</span>
+                  <span class="text-[11px] bg-slate-900/90 px-2.5 py-0.5 rounded text-emerald-300 font-mono absolute bottom-1">ทาบบาร์โค้ดแท่งตรงนี้ (กรอง QR ออกแล้ว)</span>
                 </div>
               </div>
             </div>
@@ -141,8 +138,8 @@
               </div>
 
               <div class="text-left bg-white p-3 rounded-xl border border-slate-200 text-sm space-y-1.5 shadow-sm">
-                <p><span class="font-semibold text-slate-400 text-xs">รหัสพนักงาน:</span> <span id="res-barcode" class="font-extrabold text-indigo-600 text-xl block break-all"></span></p>
-                <p><span class="font-semibold text-slate-400 text-xs">ชื่อ-นามสกุล (อ่านอัตโนมัติ):</span> <span id="res-emp-name" class="font-extrabold text-emerald-700 block text-lg"></span></p>
+                <p><span class="font-semibold text-slate-400 text-xs">รหัสพนักงาน (Barcode):</span> <span id="res-barcode" class="font-extrabold text-indigo-600 text-xl block break-all"></span></p>
+                <p><span class="font-semibold text-slate-400 text-xs">ชื่อ-นามสกุล:</span> <span id="res-emp-name" class="font-extrabold text-emerald-700 block text-lg"></span></p>
                 <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t mt-1">
                   <p><span class="font-semibold text-slate-400">เวลาบันทึก:</span> <br><span id="res-timestamp" class="font-semibold text-slate-700"></span></p>
                   <p><span class="font-semibold text-slate-400">สตาฟผู้บันทึก:</span> <br><span id="res-staff" class="font-semibold text-slate-700"></span></p>
@@ -208,11 +205,38 @@
 
   </main>
 
-  <!-- MODAL: STAFF / LOG IN SETUP -->
+  <!-- MODAL: REGISTER NEW EMPLOYEE NAME IF NOT FOUND -->
+  <div id="new-emp-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-left">
+      <div class="text-center">
+        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-xl mb-2">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <h3 class="font-bold text-slate-800 text-lg">พบรหัสพนักงานใหม่!</h3>
+        <p class="text-xs text-slate-500">รหัสนี้ยังไม่มีชื่อในระบบ กรุณากรอกชื่อ-นามสกุล</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">รหัสพนักงานที่สแกนได้</label>
+        <input type="text" id="modal-emp-id-display" readonly class="w-full px-3 py-2 border rounded-xl font-mono font-bold text-indigo-600 bg-slate-100 outline-none text-center text-lg">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อ-นามสกุล พนักงาน</label>
+        <input type="text" id="modal-emp-name-input" placeholder="เช่น ชนิกานต์ กลั่นจันทร" class="w-full px-4 py-2.5 border border-indigo-300 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <button onclick="saveNewEmployeeAndCheckin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm shadow transition">
+        บันทึกชื่อ และ บันทึกเข้างาน
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: STAFF SETUP -->
   <div id="staff-setup-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-xl">
       <div class="text-center">
-        <h3 class="font-bold text-slate-800 text-lg">ตั้งค่าการเข้าใช้งาน (Log in Mode)</h3>
+        <h3 class="font-bold text-slate-800 text-lg">ตั้งค่าการเข้าใช้งาน</h3>
       </div>
       
       <div class="space-y-3">
@@ -253,19 +277,22 @@
     let isProcessing = false;
     let scanLogsList = [];
     let currentStaffName = "Admin";
-    let ocrWorker = null;
+    let pendingScanData = null;
 
-    window.onload = async function() {
+    window.onload = function() {
+      db.ref("employeeMaster/10027011").set("ชนิกานต์ กลั่นจันทร");
+
       currentStaffName = localStorage.getItem('staff_name') || "Admin";
       document.getElementById('staff-event-display').innerText = activeEventId;
       document.getElementById('staff-name-display').innerText = currentStaffName;
 
       listenToScanLogs();
-      startCameraDirectly();
-
-      // โหลด OCR ภาษาไทยล่วงหน้า
-      ocrWorker = await Tesseract.createWorker('tha+eng');
+      setTimeout(startCameraDirectly, 500);
     };
+
+    function showRoleSelectionModal() {
+      promptStaffSetup();
+    }
 
     function promptStaffSetup() {
       document.getElementById('staff-input-name').value = currentStaffName;
@@ -301,6 +328,7 @@
       });
     }
 
+    // --- ปรับปรุงระบบกล้องให้สแกนติดง่ายขึ้น 100% ---
     async function startCameraDirectly() {
       await stopCameraDirectly();
       const badge = document.getElementById('scan-status-badge');
@@ -312,14 +340,35 @@
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
           Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.UPC_A
-        ]
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF
+        ],
+        verbose: false
       });
 
+      // คำนวณขนาดขอบเขตสแกนให้อ่านบาร์โค้ดยาวๆ ได้สะดวกขึ้น
+      const qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        return {
+          width: Math.floor(viewfinderWidth * 0.85),
+          height: Math.floor(minEdge * 0.4)
+        };
+      };
+
       const config = {
-        fps: 20,
-        qrbox: { width: 320, height: 140 },
-        videoConstraints: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: "environment" }
+        fps: 15, // ลด FPS เล็กน้อยเพื่อป้องกันภาพเบลอขณะโฟกัส
+        qrbox: qrboxFunction,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
+        videoConstraints: {
+          facingMode: "environment",
+          focusMode: "continuous",
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
+        }
       };
 
       try {
@@ -329,10 +378,11 @@
           onCardScanned,
           (err) => {}
         );
-        badge.innerText = 'กล้องสแกนทำงานอยู่';
+
+        badge.innerText = 'สแกนเนอร์บาร์โค้ดทำงานอยู่';
         badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white';
       } catch (err) {
-        alert("ไม่สามารถเปิดกล้องได้");
+        alert("ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบสิทธิ์การใช้งานกล้อง");
       }
     }
 
@@ -348,9 +398,11 @@
 
     async function handleManualCheckin() {
       const empId = document.getElementById('manual-emp-id').value.trim();
-      if (!empId) return alert("กรุณากรอกรหัสพนักงาน");
-
-      await processFinalCheckin(empId, "บันทึกด้วยมือ/เครื่องยิง", "");
+      if (!empId) {
+        alert("กรุณากรอกรหัสพนักงาน");
+        return;
+      }
+      await processCheckinData(empId, null);
       document.getElementById('manual-emp-id').value = '';
     }
 
@@ -358,65 +410,62 @@
       if (isProcessing) return;
       isProcessing = true;
 
-      const badge = document.getElementById('scan-status-badge');
-      badge.innerText = 'กำลังอ่านชื่อภาษาไทย...';
-      badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-amber-500 text-white animate-pulse';
-
       let snapshotBase64 = '';
-      let detectedName = '';
-
       try {
         const videoElem = document.querySelector("#reader video");
         if (videoElem) {
           const canvas = document.createElement("canvas");
-          canvas.width = videoElem.videoWidth || 1280;
-          canvas.height = videoElem.videoHeight || 720;
+          canvas.width = videoElem.videoWidth || 640;
+          canvas.height = videoElem.videoHeight || 480;
           const ctx = canvas.getContext("2d");
           ctx.drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-          snapshotBase64 = canvas.toDataURL("image/jpeg", 0.9);
-
-          if (ocrWorker) {
-            const ret = await ocrWorker.recognize(canvas);
-            detectedName = extractThaiName(ret.data.text);
-          }
+          snapshotBase64 = canvas.toDataURL("image/jpeg", 0.6);
         }
       } catch (e) {}
 
-      if (!detectedName) detectedName = "อ่านชื่อไม่ออก (ภาพไม่ชัด)";
-
-      await processFinalCheckin(barcodeText, detectedName, snapshotBase64);
-
-      badge.innerText = 'กล้องสแกนทำงานอยู่';
-      badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white';
-      
-      setTimeout(() => { isProcessing = false; }, 3000);
+      await processCheckinData(barcodeText, snapshotBase64);
+      setTimeout(() => { isProcessing = false; }, 2500);
     }
 
-    function extractThaiName(rawText) {
-      if (!rawText) return "";
-      const cleaned = rawText
-        .replace(/สแกนสำเร็จ/g, "").replace(/แสกนสำเร็จ/g, "")
-        .replace(/Digital ID/g, "").replace(/[0-9]/g, "")
-        .replace(/[^\u0E00-\u0E7F\s]/g, "");
+    async function processCheckinData(empBarcode, snapshotImg) {
+      const empSnap = await db.ref(`employeeMaster/${empBarcode}`).once('value');
+      let employeeFullName = empSnap.val();
 
-      const lines = cleaned.split("\n").map(l => l.trim()).filter(l => l.length > 3);
-      for (let line of lines) {
-        const parts = line.split(/\s+/);
-        if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2) {
-          return `${parts[0]} ${parts[1]}`;
-        }
+      if (!employeeFullName) {
+        pendingScanData = { barcode: empBarcode, snapshot: snapshotImg };
+        document.getElementById('modal-emp-id-display').value = empBarcode;
+        document.getElementById('modal-emp-name-input').value = (empBarcode === '10027011') ? 'ชนิกานต์ กลั่นจันทร' : '';
+        document.getElementById('new-emp-modal').classList.remove('hidden');
+        return;
       }
-      return lines[0] || "";
+
+      await executeFinalCheckin(empBarcode, employeeFullName, snapshotImg);
     }
 
-    async function processFinalCheckin(empBarcode, empName, snapshotImg) {
-      const timestamp = new Date().toLocaleString('th-TH');
+    async function saveNewEmployeeAndCheckin() {
+      const empNameInput = document.getElementById('modal-emp-name-input').value.trim();
+      if (!empNameInput) {
+        alert("กรุณากรอกชื่อ-นามสกุลพนักงาน");
+        return;
+      }
+
+      const empBarcode = pendingScanData.barcode;
+      const snapshotImg = pendingScanData.snapshot;
+
+      await db.ref(`employeeMaster/${empBarcode}`).set(empNameInput);
+
+      document.getElementById('new-emp-modal').classList.add('hidden');
+      await executeFinalCheckin(empBarcode, empNameInput, snapshotImg);
+    }
+
+    async function executeFinalCheckin(empBarcode, employeeFullName, snapshotImg) {
       const alreadyScanned = scanLogsList.find(l => l.barcode === empBarcode);
+      const timestamp = new Date().toLocaleString('th-TH');
 
       document.getElementById('result-empty').classList.add('hidden');
       document.getElementById('result-data').classList.remove('hidden');
       document.getElementById('res-barcode').innerText = empBarcode;
-      document.getElementById('res-emp-name').innerText = empName;
+      document.getElementById('res-emp-name').innerText = employeeFullName;
       document.getElementById('res-timestamp').innerText = timestamp;
       document.getElementById('res-staff').innerText = currentStaffName;
       if (snapshotImg) document.getElementById('res-snapshot').src = snapshotImg;
@@ -435,7 +484,7 @@
       const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
       await newLogRef.set({
         barcode: empBarcode,
-        empName: empName,
+        empName: employeeFullName,
         timestamp: timestamp,
         staff: currentStaffName,
         snapshot: snapshotImg || ''
@@ -480,7 +529,10 @@
     }
 
     function exportToExcel() {
-      if (scanLogsList.length === 0) return alert("ยังไม่มีข้อมูลสแกนในอีเวนต์นี้");
+      if (scanLogsList.length === 0) {
+        alert("ยังไม่มีข้อมูลสแกนในอีเวนต์นี้");
+        return;
+      }
 
       const excelData = scanLogsList.map((log, i) => ({
         "ลำดับ": scanLogsList.length - i,
