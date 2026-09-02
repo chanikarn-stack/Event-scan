@@ -126,7 +126,7 @@
 
               <div class="text-left bg-white p-3 rounded-xl border border-slate-200 text-sm space-y-1.5 shadow-sm">
                 <p><span class="font-semibold text-slate-400 text-xs">ข้อมูลที่สแกนได้:</span> <span id="res-barcode" class="font-extrabold text-indigo-600 text-lg block break-all"></span></p>
-                <p><span class="font-semibold text-slate-400 text-xs">ชื่อ-นามสกุล (อ่านจากบัตร):</span> <span id="res-emp-name" class="font-bold text-slate-800 block text-base">กำลังประมวลผล...</span></p>
+                <p><span class="font-semibold text-slate-400 text-xs">ชื่อ-นามสกุล (อ่านจากบัตร):</span> <span id="res-emp-name" onclick="editLastScanResult()" title="คลิกเพื่อแก้ไข หาก OCR อ่านผิด" class="font-bold text-slate-800 block text-base cursor-pointer hover:underline">กำลังประมวลผล...</span></p>
                 <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t mt-1">
                   <p><span class="font-semibold text-slate-400">เวลาที่บันทึก:</span> <br><span id="res-timestamp" class="font-semibold text-slate-700"></span></p>
                   <p><span class="font-semibold text-slate-400">สตาฟผู้สแกน:</span> <br><span id="res-staff" class="font-semibold text-slate-700"></span></p>
@@ -369,6 +369,12 @@
     let scanLogsList = [];
     let currentStaffName = "";
     let tesseractWorker = null;
+    let lastSavedLogKey = null; // FIX: lets the just-saved entry be corrected immediately
+
+    function editLastScanResult() {
+      if (!activeEventId || !lastSavedLogKey) return;
+      editLogEntry(lastSavedLogKey);
+    }
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -470,8 +476,32 @@
       if (!activeEventId) return;
       db.ref(`scanLogs/${activeEventId}`).on('value', snapshot => {
         const data = snapshot.val() || {};
-        scanLogsList = Object.values(data).reverse();
+        // FIX: keep the Firebase key on each entry so a mis-read OCR
+        // result can be corrected later (see editLogEntry).
+        scanLogsList = Object.entries(data)
+          .map(([key, val]) => ({ ...val, _key: key }))
+          .reverse();
         renderDashboardTable();
+      });
+    }
+
+    // NEW: since there is no external database and everything relies on
+    // OCR reading the physical card, OCR will occasionally misread a
+    // character. This lets staff quickly fix a name/ID without needing
+    // any new UI - just click the existing name text.
+    function editLogEntry(key) {
+      if (!activeEventId || !key) return;
+      const entry = scanLogsList.find(l => l._key === key);
+      if (!entry) return;
+
+      const newName = prompt("แก้ไขชื่อ-นามสกุล:", entry.empName || "");
+      if (newName === null) return; // cancelled
+      const newId = prompt("แก้ไขรหัสพนักงาน:", entry.empId || "");
+      if (newId === null) return;
+
+      db.ref(`scanLogs/${activeEventId}/${key}`).update({
+        empName: newName.trim(),
+        empId: newId.trim()
       });
     }
 
@@ -525,31 +555,51 @@
 
         const scanConfig = {
           fps: 12,
-          // FIX: a wider/shorter box matches the shape of ID-card barcodes
-          // better than a near-square box.
-          qrbox: { width: 300, height: 140 },
-          aspectRatio: 1.7777778,
+          // FIX (critical): a FIXED pixel qrbox (e.g. {width:300,height:140})
+          // can end up LARGER than the actual rendered video frame on some
+          // phones/screens - when that happens html5-qrcode silently fails
+          // to start scanning. Using a function that sizes the box as a
+          // fraction of the real viewfinder avoids that entirely and works
+          // on any screen size (desktop or mobile).
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const w = Math.floor(viewfinderWidth * 0.85);
+            const h = Math.floor(viewfinderHeight * 0.55);
+            return { width: w, height: h };
+          },
           disableFlip: false,
           experimentalFeatures: {
             useBarCodeDetectorIfSupported: true
           }
         };
 
-        // FIX: request a higher-resolution back camera stream. Low-res
-        // video is the single biggest cause of failed barcode/OCR reads.
-        const cameraConfig = {
-          facingMode: "environment"
-        };
+        // FIX: progressively relax the camera request. Phones have a rear
+        // ("environment") camera, but most desktop/laptop webcams do not -
+        // requesting facingMode:"environment" there throws
+        // OverconstrainedError and the whole scanner used to fail with a
+        // generic error. We now try the best option first and fall back
+        // step by step so the SAME code works on both mobile and desktop.
+        const cameraAttempts = [
+          { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          { facingMode: "environment" },
+          { width: { ideal: 1920 }, height: { ideal: 1080 } }, // desktop webcam, best resolution
+          {} // last resort: whatever camera the browser defaults to
+        ];
 
-        await html5QrcodeScanner.start(
-          cameraConfig,
-          scanConfig,
-          onCardScanned,
-          (errorMessage) => {
-            // per-frame "not found" callback - intentionally quiet,
-            // but keep it available for console debugging if needed.
+        let started = false;
+        let lastErr = null;
+        for (const camCfg of cameraAttempts) {
+          try {
+            await html5QrcodeScanner.start(camCfg, scanConfig, onCardScanned, () => {
+              // per-frame "not found" callback - intentionally quiet.
+            });
+            started = true;
+            break;
+          } catch (attemptErr) {
+            lastErr = attemptErr;
+            console.warn('Camera attempt failed, trying next option:', camCfg, attemptErr);
           }
-        );
+        }
+        if (!started) throw lastErr;
       } catch (err) {
         // FIX: surface the *real* browser error (permission denied, no
         // camera found, insecure context, camera already in use, etc.)
@@ -635,6 +685,23 @@
       }
       ctx.putImageData(imgData, 0, 0);
 
+      // FIX: build a second version with a plain grayscale (no hard
+      // threshold) as a fallback for OCR retry - different lighting/glare
+      // on the card sometimes reads better without the harsh cutoff.
+      const altCanvas = document.createElement("canvas");
+      altCanvas.width = canvas.width;
+      altCanvas.height = canvas.height;
+      const altCtx = altCanvas.getContext("2d");
+      altCtx.drawImage(rawCanvas, 0, 0, altCanvas.width, altCanvas.height);
+      const altData = altCtx.getImageData(0, 0, altCanvas.width, altCanvas.height);
+      const ad = altData.data;
+      for (let i = 0; i < ad.length; i += 4) {
+        const avg = (ad[i] + ad[i + 1] + ad[i + 2]) / 3;
+        ad[i] = avg; ad[i + 1] = avg; ad[i + 2] = avg;
+      }
+      altCtx.putImageData(altData, 0, 0);
+      canvas.altCanvas = altCanvas;
+
       return { base64: originalBase64, processedCanvas: canvas };
     }
 
@@ -643,33 +710,49 @@
     // name.
     function extractCardInfo(ocrText) {
       const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
-      let name = "ไม่พบชื่อบนหน้าบัตร";
+      let firstName = "";
+      let lastName = "";
+      let title = "";
       let empId = "";
 
-      const namePattern = /(ชื่อ|Name|คุณ|นาย|นางสาว|นาง|Mr\.|Mrs\.|Ms\.)\s*[:\-]?\s*([ก-๙a-zA-Z\s\.]+)/i;
-      // รองรับป้ายกำกับรหัสพนักงานหลายแบบ: "รหัสพนักงาน", "เลขที่บัตร",
-      // "เลขประจำตัว", "Employee ID", "ID No."
-      const idPattern = /(รหัสพนักงาน|เลขที่บัตร|เลขประจำตัว(?:พนักงาน)?|Employee\s*ID|Emp\.?\s*ID|ID\s*No\.?|ID\s*[:\-])\s*[:\-]?\s*([A-Za-z0-9\-]{3,15})/i;
-      // fallback: มองหากลุ่มตัวเลขล้วน 4-13 หลัก (เลขบัตรพนักงาน/เลขประจำตัว)
-      const bareNumberPattern = /\b(\d{4,13})\b/;
+      // บัตรพนักงานส่วนใหญ่แยก "ชื่อ" กับ "ชื่อสกุล/นามสกุล" คนละบรรทัด
+      // เช่น "ชื่อ  น.ส.ชนิกานต์" แล้วบรรทัดถัดไป "ชื่อสกุล  กลิ่นจันทร์"
+      const firstNamePattern = /^ชื่อ(?:สกุล)?\s*[:\-]?\s*(นาย|นาง|นางสาว|น\.ส\.|น\.ส|ด\.ช\.|ด\.ญ\.|Mr\.|Mrs\.|Ms\.)?\s*([ก-๙a-zA-Z]+)/i;
+      const lastNamePattern = /^(?:ชื่อสกุล|นามสกุล|Surname|Last\s*Name)\s*[:\-]?\s*([ก-๙a-zA-Z]+)/i;
+      // รองรับป้ายกำกับเลขประจำตัวหลายแบบ รวม "เลขที่" เฉยๆ ตามที่พบบนบัตรจริง
+      // (ตัดคำว่า "เลขประจำตำแหน่ง" ออกเพราะเป็นคนละความหมายกับเลขประจำตัวคน)
+      const idPattern = /(เลขที่|รหัสพนักงาน|เลขประจำตัวพนักงาน|เลขประจำตัวประชาชน|Employee\s*ID|Emp\.?\s*ID|ID\s*No\.?)\s*[:\-]?\s*([0-9][0-9\-]{3,15})/i;
+      const bareNumberPattern = /\b(\d{5,13})\b/;
 
       for (const line of lines) {
+        if (/^ชื่อสกุล/i.test(line) || /^นามสกุล/i.test(line)) {
+          const m = line.match(lastNamePattern);
+          if (m && m[1]) lastName = m[1].trim();
+          continue; // อย่าให้ไปโดน firstNamePattern ซ้ำ (ขึ้นต้นด้วย "ชื่อ" เหมือนกัน)
+        }
+        if (!firstName && /^ชื่อ/i.test(line)) {
+          const m = line.match(firstNamePattern);
+          if (m && m[2]) {
+            title = m[1] ? m[1].trim() : "";
+            firstName = m[2].trim();
+          }
+        }
         if (!empId) {
           const idMatch = line.match(idPattern);
           if (idMatch && idMatch[2]) {
             empId = idMatch[2].trim();
           }
         }
+      }
 
-        if (name === "ไม่พบชื่อบนหน้าบัตร") {
-          const nameMatch = line.match(namePattern);
-          if (nameMatch && nameMatch[2] && nameMatch[2].trim().length > 2) {
-            name = nameMatch[2].trim();
-          } else if (line.length > 5 && /[ก-๙]/.test(line) &&
-                     !line.includes('บัตร') && !line.includes('บริษัท') &&
-                     !idPattern.test(line)) {
-            const cleaned = line.replace(/[^ก-๙a-zA-Z\s]/g, '').trim();
-            if (cleaned.length > 3) name = cleaned;
+      // ถ้าไม่เจอชื่อจากป้ายกำกับตรงๆ ให้ fallback ไปหาบรรทัดภาษาไทยที่ดูเป็นชื่อคน
+      if (!firstName) {
+        for (const line of lines) {
+          if (line.length > 4 && /[ก-๙]/.test(line) &&
+              !/(บัตร|บริษัท|มหาวิทยาลัย|ตำแหน่ง|ราชการ|กระทรวง|สังกัด)/i.test(line) &&
+              !idPattern.test(line)) {
+            const cleaned = line.replace(/[^ก-๙a-zA-Z\s\.]/g, '').trim();
+            if (cleaned.length > 3) { firstName = cleaned; break; }
           }
         }
       }
@@ -678,14 +761,12 @@
       if (!empId) {
         for (const line of lines) {
           const numMatch = line.match(bareNumberPattern);
-          if (numMatch) {
-            empId = numMatch[1];
-            break;
-          }
+          if (numMatch) { empId = numMatch[1]; break; }
         }
       }
 
-      return { name, empId };
+      const fullName = [title, firstName, lastName].filter(Boolean).join(' ').trim();
+      return { name: fullName || "ไม่พบชื่อบนหน้าบัตร", empId };
     }
 
     async function onCardScanned(barcodeText) {
@@ -714,6 +795,7 @@
         const shownName = alreadyScanned.empName || "ไม่ระบุชื่อ";
         const shownId = alreadyScanned.empId ? ` (รหัส: ${alreadyScanned.empId})` : '';
         document.getElementById('res-emp-name').innerText = shownName + shownId;
+        lastSavedLogKey = alreadyScanned._key || null;
         setTimeout(() => { isProcessing = false; }, 2500);
         return;
       }
@@ -731,7 +813,16 @@
             tesseractWorker = await Tesseract.createWorker('tha+eng');
           }
           const ret = await tesseractWorker.recognize(processedCanvas);
-          const info = extractCardInfo(ret.data.text);
+          let info = extractCardInfo(ret.data.text);
+
+          // FIX: ถ้ารอบแรกอ่านไม่เจอทั้งชื่อและรหัส (แสงตกกระทบ/มุมกล้องต่างกัน)
+          // ลองรอบสองด้วยภาพ threshold คนละค่า ก่อนจะยอมแพ้
+          if (info.name === "ไม่พบชื่อบนหน้าบัตร" && !info.empId) {
+            const retry = await tesseractWorker.recognize(processedCanvas.altCanvas || processedCanvas);
+            const info2 = extractCardInfo(retry.data.text);
+            if (info2.name !== "ไม่พบชื่อบนหน้าบัตร" || info2.empId) info = info2;
+          }
+
           extractedName = info.name;
           extractedId = info.empId;
         } catch (err) {
@@ -744,6 +835,7 @@
 
       // บันทึกขึ้น Realtime Database
       const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
+      lastSavedLogKey = newLogRef.key; // FIX: enables quick-correct via editLastScanResult()
       await newLogRef.set({
         barcode: barcodeText,
         empName: extractedName,
@@ -785,7 +877,7 @@
             <td class="py-3 px-4 font-semibold text-slate-400">${logs.length - index}</td>
             <td class="py-3 px-4 text-xs text-slate-500 font-medium">${log.timestamp}</td>
             <td class="py-3 px-4 font-mono font-bold text-indigo-600 break-all">${log.barcode}</td>
-            <td class="py-3 px-4 font-bold text-slate-800">${nameCell}</td>
+            <td class="py-3 px-4 font-bold text-slate-800 cursor-pointer hover:underline" title="คลิกเพื่อแก้ไขชื่อ/รหัส (กรณี OCR อ่านผิด)" onclick="editLogEntry('${log._key}')">${nameCell}</td>
             <td class="py-3 px-4 font-semibold text-slate-700 text-xs">${log.staff}</td>
             <td class="py-3 px-4 text-center">
               ${log.snapshot ? `<img src="${log.snapshot}" class="w-12 h-8 object-cover rounded border mx-auto bg-black shadow-sm">` : '-'}
