@@ -3,1141 +3,341 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event Management & Check-in System</title>
-
+  <title>Dashboard รายชื่อผู้สแกนเข้างาน</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Firebase App & Database -->
+  <!-- Tesseract.js (OCR) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <!-- Firebase App & Database (Compat Scripts) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <!-- HTML5 QR Code Scanner -->
+  <!-- HTML5-QRCode library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- QRCode Generator -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- SheetJS (Excel Parser & Export) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <!-- Signature Pad -->
-  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
-  <!-- jsPDF & html2canvas -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-  <style>
-    .no-mirror video { transform: scaleX(1) !important; }
-    #reader video { transform: scaleX(-1); }
-  </style>
 </head>
-<body class="bg-slate-100 min-h-screen p-3 md:p-6 font-sans text-slate-800">
+<body class="bg-slate-50 min-h-screen p-4 md:p-8 font-sans">
 
-  <div class="max-w-7xl mx-auto space-y-5">
+  <div class="max-w-6xl mx-auto space-y-6">
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
-      <div class="flex items-center gap-3 cursor-pointer" onclick="showView('events-list')">
-        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl font-bold">🎪</div>
-        <div>
-          <h1 class="font-bold text-base text-slate-800">ระบบเช็กอิน & จัดการอีเวนต์</h1>
-          <p class="text-xs text-slate-400" id="nav-subtitle">หน้าหลักรายการอีเวนต์</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <!-- Badge แสดงสถานะ Admin/Staff -->
-        <div id="admin-badge" class="hidden bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold px-3 py-1.5 rounded-xl">
-          👑 โหมดผู้ดูแลระบบ (Admin)
-        </div>
-        <button id="btn-admin-login" onclick="openAdminAuthModal()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl transition">
-          🔑 เข้าสู่ระบบ Admin
-        </button>
-        <button id="btn-admin-logout" onclick="logoutAdmin()" class="hidden bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition">
-          ออกจากระบบ
-        </button>
-      </div>
-    </header>
-
-    <!-- ================================================================= -->
-    <!-- VIEW 1: EVENT LIST (หน้าแรก - รายการอีเวนต์ทั้งหมด ข้อ 1)       -->
-    <!-- ================================================================= -->
-    <section id="view-events-list" class="space-y-5">
-      <div class="flex flex-wrap justify-between items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">รายการอีเวนต์ทั้งหมด</h2>
-          <p class="text-xs text-slate-400">เลือกอีเวนต์เพื่อเข้าไปจัดการข้อมูล สแกน หรือดู Dashboard</p>
-        </div>
-        <button onclick="checkAdminAction(() => openCreateEventModal())" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition">
-          + สร้างอีเวนต์ใหม่ (Admin Only)
-        </button>
-      </div>
-
-      <!-- Grid แสดงรายการอีเวนต์ -->
-      <div id="events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Event Cards Dynamic Render -->
-      </div>
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- VIEW 2: EVENT DETAIL & MANAGEMENT (หน้าจัดการรายอีเวนต์ ข้อ 3, 5) -->
-    <!-- ================================================================= -->
-    <section id="view-event-detail" class="hidden space-y-5">
+    <!-- Section: กล้องและผลลัพธ์การสแกน -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      <!-- Back Button & Header -->
-      <div class="bg-indigo-900 text-white p-5 rounded-2xl shadow-sm flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <button onclick="showView('events-list')" class="text-xs text-indigo-300 hover:text-white font-bold mb-1">← กลับไปหน้าอีเวนต์ทั้งหมด</button>
-          <h2 id="detail-event-name" class="text-xl font-bold">ชื่ออีเวนต์...</h2>
-          <p id="detail-event-dates" class="text-xs text-indigo-200 mt-0.5"></p>
+      <!-- ปุ่มควบคุมกล้องและแสดงวิดีโอ -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-between space-y-4">
+        <div class="w-full relative overflow-hidden rounded-xl bg-black aspect-video flex items-center justify-center">
+          <div id="reader" class="w-full h-full"></div>
         </div>
-
-        <div class="flex flex-wrap gap-2">
-          <button onclick="openStaffAccessModal()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">
-            📱 สแกน QR เข้าใช้งานสำหรับสตาฟ/iPad (ข้อ 4)
+        
+        <div class="flex gap-4 w-full">
+          <button id="btn-start" onclick="startScanner()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728M12 9v6m0 0l3-3m-3 3l-3-3"></path></svg>
+            เปิดกล้องสแกน
           </button>
-          <button onclick="switchViewDetailTab('scan')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">
-            📷 หน้าสแกน & Dashboard (สตาฟ)
+          <button id="btn-stop" onclick="stopScanner()" class="flex-1 bg-rose-400 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
+            <span class="w-3 h-3 bg-white rounded-sm"></span>
+            ปิดกล้อง
           </button>
         </div>
       </div>
 
-      <!-- Sub Tabs: Admin Settings vs Attendee List -->
-      <div class="flex border-b border-slate-200 bg-white rounded-t-2xl px-4 pt-3 gap-4 text-xs font-bold text-slate-500">
-        <button id="tab-btn-attendees" onclick="switchDetailSubTab('attendees')" class="pb-3 border-b-2 border-indigo-600 text-indigo-600">
-          👥 รายชื่อผู้ลงทะเบียน & ส่งอีเมล (ข้อ 5)
-        </button>
-        <button id="tab-btn-config" onclick="checkAdminAction(() => switchDetailSubTab('config'))" class="pb-3 border-b-2 border-transparent hover:text-slate-800">
-          ⚙️ ตั้งค่าฟิลด์ข้อมูล/รอบสแกน/แพทเทิร์นอีเมล (Admin)
-        </button>
-      </div>
+      <!-- ส่วนแสดงผลสถานะการสแกนล่าสุด -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
+        <div id="result-empty" class="text-center text-slate-400 py-12">
+          <p class="text-lg font-medium">พร้อมสแกนข้อมูล</p>
+          <p class="text-sm">กรุณาส่องบาร์โค้ดหรือบัตรพนักงานหน้ากล้อง</p>
+        </div>
 
-      <!-- SUB-TAB 1: รายชื่อผู้ลงทะเบียน & เจน QR Code (ข้อ 5) -->
-      <div id="subtab-attendees" class="space-y-5">
-        <div class="bg-white p-5 rounded-b-2xl shadow-sm border border-slate-200 space-y-4">
-          <div class="flex flex-wrap justify-between items-center gap-4">
-            <div>
-              <h3 class="font-bold text-sm text-slate-800">ผู้ลงทะเบียนเข้าร่วมงาน</h3>
-              <p class="text-xs text-slate-400">QR Code ประจำตัวนี้สามารถใช้สแกนได้ทุกรอบของอีเวนต์นี้</p>
-            </div>
-            
-            <div class="flex flex-wrap gap-2">
-              <input type="file" id="excel-import-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="importExcelCustomFields(event)">
-              <button onclick="checkAdminAction(() => document.getElementById('excel-import-file').click())" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition">
-                📥 นำเข้า Excel (ตามหัวข้อไฟล์)
-              </button>
-              <button onclick="sendBulkDraftEmails()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition">
-                ✉️ ดราฟส่งอีเมล QR ทั้งหมด
-              </button>
-            </div>
+        <div id="result-data" class="hidden space-y-4">
+          <div id="scan-alert-badge" class="py-2 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300 text-center">
+            ✅ บันทึกเข้างานสำเร็จ!
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr id="attendees-table-head" class="border-b border-slate-200 font-bold uppercase text-slate-400 bg-slate-50">
-                  <!-- Dynamic Headers -->
-                </tr>
-              </thead>
-              <tbody id="attendees-table-body" class="divide-y divide-slate-100">
-                <!-- Dynamic Attendee Rows -->
-              </tbody>
-            </table>
+          <div class="space-y-2 text-sm text-slate-600">
+            <p><strong>ข้อมูลที่สแกน:</strong> <span id="res-barcode" class="text-indigo-600 font-bold"></span></p>
+            <p><strong>ชื่อ-นามสกุล:</strong> <span id="res-emp-name" class="text-slate-900 font-bold"></span></p>
+            <p><strong>เวลาสแกน:</strong> <span id="res-timestamp"></span></p>
+            <p><strong>สตาฟผู้สแกน:</strong> <span id="res-staff">Admin</span></p>
+          </div>
+
+          <div class="pt-2">
+            <p class="text-xs font-bold text-slate-400 mb-1">หลักฐาน SNAPSHOT</p>
+            <img id="res-snapshot" src="" alt="Snapshot" class="w-32 h-20 object-cover rounded-lg border border-slate-200 shadow-sm">
           </div>
         </div>
       </div>
 
-      <!-- SUB-TAB 2: Admin Config (ข้อ 2, 3, 5) -->
-      <div id="subtab-config" class="hidden space-y-5">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          
-          <!-- รอบการสแกน (ข้อ 2) -->
-          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800 border-b pb-2">1. เพิ่มรอบการสแกน (Sessions)</h3>
-            <div class="space-y-2 text-xs">
-              <input type="text" id="cfg-session-name" placeholder="ชื่อรอบ เช่น วันที่ 16 - ช่วงเช้า" class="w-full border rounded-xl p-2">
-              <div class="grid grid-cols-2 gap-2">
-                <input type="date" id="cfg-session-date" class="border rounded-xl p-2">
-                <input type="time" id="cfg-session-time" class="border rounded-xl p-2">
-              </div>
-              <button onclick="saveNewSession()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-xl transition">
-                + เพิ่มรอบสแกนในระบบ
-              </button>
-            </div>
-            <div id="session-list-box" class="pt-2 divide-y divide-slate-100 text-xs">
-              <!-- Render Session List -->
-            </div>
-          </div>
+    </div>
 
-          <!-- แพทเทิร์นข้อความอีเมล (ข้อ 5) -->
-          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-            <h3 class="font-bold text-sm text-slate-800 border-b pb-2">2. แพทเทิร์นข้อความแจ้งเตือนทางอีเมล</h3>
-            <div class="space-y-2 text-xs">
-              <label class="block font-bold text-slate-500">หัวข้ออีเมล (Subject)</label>
-              <input type="text" id="cfg-email-subject" class="w-full border rounded-xl p-2 font-bold text-slate-800" placeholder="แจ้ง QR Code สำหรับเข้าร่วมงาน...">
-              
-              <label class="block font-bold text-slate-500">เนื้อหาข้อความ (Email Body Pattern)</label>
-              <textarea id="cfg-email-body" rows="4" class="w-full border rounded-xl p-2" placeholder="เรียนคุณ {name}, รหัสเข้าร่วมงานของคุณคือ {id}..."></textarea>
-              
-              <button onclick="saveEmailPattern()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl transition">
-                บันทึกแพทเทิร์นอีเมล
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- VIEW 3: STAFF SCANNER & DASHBOARD (หน้าสแกน & ผลการลงชื่อ ข้อ 4, 7) -->
-    <!-- ================================================================= -->
-    <section id="view-staff-scan" class="hidden space-y-5">
+    <!-- Section: Dashboard รายชื่อ -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
       
-      <!-- Top Control Bar -->
-      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <button onclick="showView('event-detail')" class="text-xs text-indigo-600 font-bold mb-1">← กลับหน้าจัดการอีเวนต์</button>
-          <h2 id="staff-view-event-title" class="font-bold text-base text-slate-800">สแกนเข้างาน</h2>
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            Dashboard รายชื่อผู้สแกนเข้างาน
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">ข้อมูลเรียลไทม์ประจำอีเวนต์นี้</p>
         </div>
 
         <div class="flex items-center gap-3">
-          <label class="text-xs font-bold text-slate-500">เลือกรอบการสแกนปัจจุบัน:</label>
-          <select id="staff-session-selector" onchange="onStaffSessionChange(this.value)" class="bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-xl px-3 py-2">
-            <!-- Sessions -->
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <!-- กล้องสแกน -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-          <div class="flex justify-between items-center">
-            <h3 class="font-bold text-sm text-slate-800">กล้องสแกน QR Code</h3>
-            <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-              <input type="checkbox" id="chk-flip-camera" onchange="toggleCameraFlip()" class="rounded text-indigo-600">
-              <span>กลับด้านกล้อง (Mirror)</span>
-            </label>
-          </div>
-
-          <div class="relative overflow-hidden rounded-2xl bg-black aspect-video flex items-center justify-center border">
-            <div id="reader" class="w-full h-full"></div>
-          </div>
-
-          <div class="flex gap-2">
-            <button id="btn-start" onclick="startScanner()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition">เปิดกล้อง</button>
-            <button id="btn-stop" onclick="stopScanner()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2.5 rounded-xl text-xs transition">ปิดกล้อง</button>
-          </div>
-
-          <button onclick="openWalkinModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs transition">
-            + ลงทะเบียนหน้างาน (Walk-in)
+          <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Export Excel
           </button>
-        </div>
+          
+          <span class="bg-indigo-50 text-indigo-700 text-sm font-bold py-2 px-4 rounded-xl">
+            รวม: <span id="total-count">0</span> คน
+          </span>
 
-        <!-- ผลลัพธ์ล่าสุด -->
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
-          <div id="result-empty" class="text-center text-slate-400 py-10 space-y-2">
-            <span class="text-4xl">📱</span>
-            <p class="text-sm font-bold">พร้อมสแกนข้อมูล</p>
-          </div>
-
-          <div id="result-data" class="hidden space-y-3">
-            <div class="py-2 px-3 rounded-xl font-bold text-xs bg-emerald-100 text-emerald-800 border border-emerald-200 text-center">
-              ✅ บันทึกเช็กอินสำเร็จ!
-            </div>
-            <div id="scan-result-details" class="space-y-1.5 text-xs text-slate-600 border-b pb-3"></div>
-            <div>
-              <p class="text-[11px] font-bold text-slate-400 mb-1">ลายเซ็นยืนยัน</p>
-              <img id="res-signature-img" src="" class="h-16 object-contain rounded-xl border bg-slate-50 p-1">
-            </div>
-          </div>
+          <input type="text" id="search-input" onkeyup="renderTable()" placeholder="ค้นหารหัส/ชื่อ..." class="border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 md:w-64">
         </div>
       </div>
 
-      <!-- Dashboard รายชื่อผู้สแกน / ยังไม่สแกน & ส่งออกไฟล์ (ข้อ 7) -->
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h3 class="text-base font-bold text-slate-800">Dashboard ตรวจสอบการสแกนเข้างาน</h3>
-            <p class="text-xs text-slate-400">ค้นหารายชื่อ ตรวจสอบสถานะการเข้าร่วม และส่งออกข้อมูล</p>
-          </div>
-
-          <!-- Controls & Export (ข้อ 7) -->
-          <div class="flex flex-wrap items-center gap-2">
-            <select id="filter-status-select" onchange="renderDashboardTable()" class="border rounded-xl text-xs p-2 font-bold bg-slate-50">
-              <option value="ALL">แสดงทั้งหมด</option>
-              <option value="CHECKED_IN">สแกนแล้ว</option>
-              <option value="NOT_YET">ยังไม่สแกน</option>
-            </select>
-
-            <input type="text" id="dashboard-search" onkeyup="renderDashboardTable()" placeholder="ค้นหาชื่อ/รหัส..." class="border rounded-xl text-xs p-2 w-40 md:w-56">
-
-            <button onclick="exportExcelReport()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition">
-              📊 ส่งออก Excel
-            </button>
-            <button onclick="exportSignedPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition">
-              📄 ใบเซ็นชื่อ PDF
-            </button>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr class="border-b border-slate-200 text-slate-400 font-bold uppercase bg-slate-50">
-                <th class="py-2.5 px-3">ลำดับ</th>
-                <th class="py-2.5 px-3">เวลาสแกน</th>
-                <th class="py-2.5 px-3">ชื่อ-นามสกุล</th>
-                <th class="py-2.5 px-3">สถานะ</th>
-                <th class="py-2.5 px-3">ลายเซ็น</th>
-              </tr>
-            </thead>
-            <tbody id="dashboard-logs-tbody" class="divide-y divide-slate-100">
-              <!-- Dynamic Rows -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- VIEW 4: IPAD STANDALONE SIGNATURE                                 -->
-    <!-- ================================================================= -->
-    <section id="view-ipad-standalone" class="hidden min-h-[70vh] flex flex-col items-center justify-center">
-      <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md text-center space-y-5 border border-slate-100">
-        <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-3xl">✏️</div>
-        <h2 class="text-xl font-bold text-slate-800">โหมด iPad รับลายเซ็น</h2>
-        <p class="text-xs text-slate-400">เมื่อสตาฟสแกน QR หน้าจอจะเด้งป๊อปอัปเซ็นชื่อทันที</p>
-        
-        <div id="ipad-status-badge" class="py-2.5 px-4 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
-          ⏳ รอรับสัญญาณการสแกนจากเครื่องสตาฟ...
-        </div>
-      </div>
-    </section>
-
-  </div>
-
-
-  <!-- ================================================================= -->
-  <!-- MODALS & POPUPS                                                  -->
-  <!-- ================================================================= -->
-
-  <!-- Modal: ล็อกอิน Admin (รหัส CU1234 - ข้อ 6) -->
-  <div id="modal-admin-auth" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-      <h3 class="font-bold text-base text-slate-800 text-center">🔐 ยืนยันสิทธิ์ผู้ดูแลระบบ (Admin)</h3>
-      <p class="text-xs text-slate-400 text-center">กรุณากรอกรหัสผ่านเพื่อเข้าสู่โหมดผู้ดูแลระบบ</p>
-      
-      <input type="password" id="admin-pass-input" placeholder="กรอกรหัสผ่าน (CU1234)" class="w-full border rounded-xl p-3 text-center text-sm font-bold tracking-widest focus:ring-2 focus:ring-indigo-500">
-      
-      <div class="flex gap-2">
-        <button onclick="closeModal('modal-admin-auth')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs">ยกเลิก</button>
-        <button onclick="submitAdminAuth()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs">ยืนยัน</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: สร้างอีเวนต์ใหม่ (ข้อ 1 & 2) -->
-  <div id="modal-create-event" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
-      <h3 class="font-bold text-base text-slate-800">🎪 สร้างอีเวนต์ใหม่</h3>
-      <div class="space-y-3 text-xs">
-        <div>
-          <label class="block font-bold text-slate-500 mb-1">ชื่ออีเวนต์</label>
-          <input type="text" id="new-evt-name" placeholder="เช่น งานสัมมนาวิชาการประจำปี 2026" class="w-full border rounded-xl p-2.5 font-bold">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block font-bold text-slate-500 mb-1">วันที่เริ่ม</label>
-            <input type="date" id="new-evt-start" class="w-full border rounded-xl p-2">
-          </div>
-          <div>
-            <label class="block font-bold text-slate-500 mb-1">วันที่สิ้นสุด</label>
-            <input type="date" id="new-evt-end" class="w-full border rounded-xl p-2">
-          </div>
-        </div>
-      </div>
-      <div class="flex gap-2">
-        <button onclick="closeModal('modal-create-event')" class="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">ยกเลิก</button>
-        <button onclick="submitCreateEvent()" class="flex-1 bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">สร้างอีเวนต์</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: สแกน QR / เลือกโหมดเข้าใช้งานสำหรับสตาฟ/iPad (ข้อ 4) -->
-  <div id="modal-staff-access" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-5 text-center">
-      <h3 class="font-bold text-base text-slate-800">📱 QR Code เข้าใช้งานสำหรับสตาฟ & iPad</h3>
-      <p class="text-xs text-slate-400">ใช้มือถือสตาฟหรือ iPad สแกน QR เพื่อเข้าสู่หน้างานของอีเวนต์นี้ทันที</p>
-      
-      <div class="p-4 bg-slate-50 rounded-2xl border flex flex-col items-center space-y-3">
-        <div id="access-qr-box" class="p-2 bg-white rounded-xl shadow-sm"></div>
-        <select id="access-mode-select" onchange="generateStaffAccessQR()" class="border rounded-xl text-xs p-2 font-bold bg-white w-full">
-          <option value="scan_and_sign">โหมด 1: เครื่องเดียว (สแกน + เซ็นชื่อบนมือถือสตาฟ)</option>
-          <option value="scan_only">โหมด 2: สแกนอย่างเดียว (จับคู่ iPad)</option>
-          <option value="sign_only">โหมด 3: เครื่องเซ็นชื่อบน iPad (Standalone)</option>
-        </select>
-      </div>
-
-      <button onclick="closeModal('modal-staff-access')" class="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs">ปิดหน้าต่าง</button>
-    </div>
-  </div>
-
-  <!-- Modal: ระบุชื่อสตาฟผู้ใช้งาน (ข้อ 4) -->
-  <div id="modal-staff-name" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-      <h3 class="font-bold text-base text-slate-800 text-center">👤 ระบุชื่อสตาฟผู้ใช้งาน</h3>
-      <input type="text" id="staff-operator-name" placeholder="กรอกชื่อ-นามสกุล ของสตาฟ" class="w-full border rounded-xl p-2.5 text-xs font-bold">
-      <button onclick="saveStaffOperatorName()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">เริ่มใช้งาน</button>
-    </div>
-  </div>
-
-  <!-- Modal: ป๊อปอัปเซ็นชื่อ (ระบุชื่อผู้เข้าร่วมงานชัดเจนด้านบน - โจทย์กำหนด) -->
-  <div id="modal-signature" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden space-y-0">
-      
-      <!-- Header ระบุชื่อผู้เซ็นชื่อชัดเจนด้านบนเสมอ -->
-      <div class="bg-indigo-600 p-4 text-white flex justify-between items-center">
-        <div>
-          <p class="text-[10px] text-indigo-200 uppercase font-bold tracking-wider">ช่องเซ็นชื่อผู้เข้าร่วมงาน</p>
-          <h3 id="pop-header-title" class="font-bold text-base md:text-lg">คุณ...</h3>
-        </div>
-        <button onclick="closeModal('modal-signature')" class="text-white/80 hover:text-white font-bold text-lg">✕</button>
-      </div>
-
-      <div class="p-5 space-y-4">
-        <div id="pop-fields-container" class="grid grid-cols-2 gap-2 text-xs">
-          <!-- Dynamic Custom Fields -->
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-600 mb-1">กรุณาเซ็นชื่อด้านล่าง</label>
-          <div class="border-2 border-dashed border-indigo-200 rounded-2xl bg-slate-50 overflow-hidden">
-            <canvas id="signature-canvas" class="w-full h-40 touch-none"></canvas>
-          </div>
-          <button onclick="clearSignatureCanvas()" class="mt-1 text-[11px] text-rose-500 hover:underline font-bold">ล้างลายเซ็น</button>
-        </div>
-
-        <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
-          ✅ ยืนยันข้อมูลและบันทึกเข้างาน
-        </button>
+      <!-- ตารางแสดงรายการ -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <th class="py-3 px-4">ลำดับ</th>
+              <th class="py-3 px-4">เวลาสแกน</th>
+              <th class="py-3 px-4">ข้อมูลที่สแกน</th>
+              <th class="py-3 px-4">ชื่อ-นามสกุล</th>
+              <th class="py-3 px-4">สตาฟผู้สแกน</th>
+              <th class="py-3 px-4">หลักฐาน SNAPSHOT</th>
+            </tr>
+          </thead>
+          <tbody id="logs-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+            <!-- ข้อมูลจะถูกโหลดจาก Firebase และใส่ที่นี่ -->
+          </tbody>
+        </table>
       </div>
 
     </div>
+
   </div>
 
-  <!-- Modal: Walk-in หน้างาน -->
-  <div id="modal-walkin" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-5 space-y-4">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-sm text-slate-800">ลงทะเบียน Walk-in หน้างาน</h3>
-        <button onclick="closeModal('modal-walkin')" class="text-slate-400 font-bold">✕</button>
-      </div>
-      <div id="walkin-fields-container" class="space-y-3 text-xs"></div>
-      <button onclick="submitWalkin()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs">ไปหน้าเซ็นชื่อ</button>
-    </div>
-  </div>
-
-  <!-- PDF Print Template -->
-  <div id="pdf-template" class="hidden p-8 bg-white text-slate-900 space-y-4">
-    <div class="text-center border-b pb-4">
-      <h2 id="pdf-header-event-name" class="text-xl font-bold">ชื่ออีเวนต์...</h2>
-      <p id="pdf-header-dates" class="text-xs text-slate-500 mt-1">วันที่จัดงาน...</p>
-      <p id="pdf-header-session" class="text-xs font-bold text-indigo-600 mt-0.5">รอบสแกน...</p>
-    </div>
-    <table class="w-full border-collapse border border-slate-300 text-xs">
-      <thead>
-        <tr class="bg-slate-100">
-          <th class="border p-2">ลำดับ</th>
-          <th class="border p-2">เวลาสแกน</th>
-          <th class="border p-2">ชื่อ-นามสกุล</th>
-          <th class="border p-2 text-center">ลายเซ็น</th>
-        </tr>
-      </thead>
-      <tbody id="pdf-table-body"></tbody>
-    </table>
-  </div>
-
-
-  <!-- ================================================================= -->
-  <!-- JAVASCRIPT SYSTEM LOGIC                                          -->
-  <!-- ================================================================= -->
   <script>
-    // 1. Config Firebase
-    const firebaseConfig = { databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com" };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // 2. Global State Variables
-    let isAdmin = false;
-    let currentEventId = null;
-    let currentSessionId = "SESSION_ALL";
-    let eventsData = {};
-    let currentAttendees = {};
-    let currentLogs = {};
-    let currentFields = ["empName"]; // Default มีแค่ ชื่อ ตามโจทย์ข้อ 3
-    let staffOperatorName = "";
-    let staffDeviceMode = "scan_and_sign";
-    let html5QrcodeScanner = null;
-    let signaturePad = null;
-    let isProcessing = false;
-    let activeUserForSign = null;
-
-    // 3. System Initialization
-    window.onload = () => {
-      initSignaturePad();
-      checkUrlParams();
-      listenEventsFromDB();
+    // Config ตั้งค่า Firebase (กรอกคอนฟิกของคุณตามเดิมได้ที่นี่)
+    const firebaseConfig = {
+      databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com"
     };
 
-    function initSignaturePad() {
-      const canvas = document.getElementById('signature-canvas');
-      signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(248, 250, 252)' });
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
+    const db = firebase.database();
 
-    function clearSignatureCanvas() { if (signaturePad) signaturePad.clear(); }
+    const activeEventId = "default_event";
+    const currentStaffName = "Admin";
 
-    function checkUrlParams() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const eventId = urlParams.get('event');
-      const mode = urlParams.get('mode');
-      const staff = urlParams.get('staff');
+    let html5QrcodeScanner = null;
+    let isProcessing = false;
+    let scanLogsList = [];
 
-      if (eventId) currentEventId = eventId;
-      if (staff) staffOperatorName = staff;
-      if (mode) {
-        staffDeviceMode = mode;
-        if (mode === 'sign_only') showView('ipad-standalone');
-        else if (mode === 'scan_and_sign' || mode === 'scan_only') switchViewDetailTab('scan');
-      }
-    }
-
-    // 4. Admin Auth Management (รหัส CU1234 - ข้อ 6)
-    function openAdminAuthModal() {
-      document.getElementById('modal-admin-auth').classList.remove('hidden');
-    }
-
-    function submitAdminAuth() {
-      const pass = document.getElementById('admin-pass-input').value;
-      if (pass === 'CU1234') {
-        isAdmin = true;
-        document.getElementById('admin-badge').classList.remove('hidden');
-        document.getElementById('btn-admin-login').classList.add('hidden');
-        document.getElementById('btn-admin-logout').classList.remove('hidden');
-        closeModal('modal-admin-auth');
-        alert('เข้าสู่โหมด Admin เรียบร้อยแล้ว');
-        renderEventsGrid();
-      } else {
-        alert('รหัสผ่านไม่ถูกต้อง');
-      }
-    }
-
-    function logoutAdmin() {
-      isAdmin = false;
-      document.getElementById('admin-badge').classList.add('hidden');
-      document.getElementById('btn-admin-login').classList.remove('hidden');
-      document.getElementById('btn-admin-logout').classList.add('hidden');
-      showView('events-list');
-    }
-
-    function checkAdminAction(callback) {
-      if (!isAdmin) {
-        alert('ฟีเจอร์นี้สำหรับผู้ดูแลระบบ (Admin) เท่านั้น กรุณาเข้าสู่ระบบด้วยรหัส CU1234');
-        openAdminAuthModal();
-      } else {
-        callback();
-      }
-    }
-
-    // 5. Views Switching Logic
-    function showView(viewId) {
-      document.getElementById('view-events-list').classList.add('hidden');
-      document.getElementById('view-event-detail').classList.add('hidden');
-      document.getElementById('view-staff-scan').classList.add('hidden');
-      document.getElementById('view-ipad-standalone').classList.add('hidden');
-
-      stopScanner();
-
-      if (viewId === 'events-list') {
-        document.getElementById('nav-subtitle').innerText = "หน้าหลักรายการอีเวนต์";
-        document.getElementById('view-events-list').classList.remove('hidden');
-      } else if (viewId === 'event-detail') {
-        document.getElementById('view-event-detail').classList.remove('hidden');
-      } else if (viewId === 'staff-scan') {
-        document.getElementById('view-staff-scan').classList.remove('hidden');
-        if (!staffOperatorName) document.getElementById('modal-staff-name').classList.remove('hidden');
-        startScanner();
-      } else if (viewId === 'ipad-standalone') {
-        document.getElementById('view-ipad-standalone').classList.remove('hidden');
-        listenIpadPairing();
-      }
-    }
-
-    // 6. Event CRUD Operations (ข้อ 1 & 2)
-    function listenEventsFromDB() {
-      db.ref('events').on('value', snapshot => {
-        eventsData = snapshot.val() || {};
-        renderEventsGrid();
-        if (currentEventId && eventsData[currentEventId]) {
-          bindEventDetailData();
-        }
-      });
-    }
-
-    function renderEventsGrid() {
-      const grid = document.getElementById('events-grid');
-      grid.innerHTML = '';
-
-      Object.keys(eventsData).forEach(evtId => {
-        const evt = eventsData[evtId];
-        const card = document.createElement('div');
-        card.className = "bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition space-y-3 flex flex-col justify-between";
-        card.innerHTML = `
-          <div class="space-y-1">
-            <span class="text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Event</span>
-            <h3 class="font-bold text-base text-slate-800 break-words">${evt.name}</h3>
-            <p class="text-xs text-slate-400">📅 ${evt.startDate || '-'} ถึง ${evt.endDate || '-'}</p>
-          </div>
-          <div class="flex gap-2 pt-2 border-t">
-            <button onclick="openEventDetail('${evtId}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition">จัดการอีเวนต์</button>
-            ${isAdmin ? `<button onclick="deleteEvent('${evtId}')" class="text-rose-500 hover:bg-rose-50 px-2.5 py-2 rounded-xl font-bold text-xs">🗑️</button>` : ''}
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-    }
-
-    function openCreateEventModal() {
-      document.getElementById('modal-create-event').classList.remove('hidden');
-    }
-
-    function submitCreateEvent() {
-      const name = document.getElementById('new-evt-name').value.trim();
-      const start = document.getElementById('new-evt-start').value;
-      const end = document.getElementById('new-evt-end').value;
-
-      if (!name) return alert('กรุณากรอกชื่ออีเวนต์');
-
-      const evtId = `EVT_${Date.now().toString().slice(-6)}`;
-      db.ref(`events/${evtId}`).set({
-        name: name,
-        startDate: start,
-        endDate: end,
-        fields: ["empName"], // Default แค่ชื่อ ตามโจทย์ข้อ 3
-        sessions: {
-          "SESS_DEFAULT": { name: "รอบทั่วไป", date: start || new Date().toISOString().split('T')[0], time: "09:00" }
-        },
-        emailSubject: `QR Code สำหรับเข้าร่วมงาน ${name}`,
-        emailBody: `เรียนผู้เข้าร่วมงาน,\nรหัส QR Code ประจำตัวของคุณสำหรับงาน ${name} อยู่ในไฟล์แนบนี้`
-      }, () => {
-        closeModal('modal-create-event');
-        openEventDetail(evtId);
-      });
-    }
-
-    function deleteEvent(evtId) {
-      if (confirm('คุณต้องการลบอีเวนต์นี้ใช่หรือไม่?')) {
-        db.ref(`events/${evtId}`).remove();
-        db.ref(`attendees/${evtId}`).remove();
-        db.ref(`scanLogs/${evtId}`).remove();
-      }
-    }
-
-    // 7. Event Detail & Sub-Tabs Logic
-    function openEventDetail(evtId) {
-      currentEventId = evtId;
-      bindEventDetailData();
-      showView('event-detail');
-    }
-
-    function bindEventDetailData() {
-      const evt = eventsData[currentEventId];
-      if (!evt) return;
-
-      document.getElementById('detail-event-name').innerText = evt.name;
-      document.getElementById('detail-event-dates').innerText = `📅 วันที่จัดงาน: ${evt.startDate || '-'} ถึง ${evt.endDate || '-'}`;
-      document.getElementById('nav-subtitle').innerText = `จัดการอีเวนต์: ${evt.name}`;
-
-      currentFields = evt.fields || ["empName"];
-
-      // ดึงผู้ลงทะเบียน
-      db.ref(`attendees/${currentEventId}`).on('value', snap => {
-        currentAttendees = snap.val() || {};
-        renderAttendeesTable();
-      });
-
-      // ดึง Logs
-      db.ref(`scanLogs/${currentEventId}`).on('value', snap => {
-        currentLogs = snap.val() || {};
-        renderDashboardTable();
-      });
-
-      // Render Config Sessions
-      renderSessionsConfigList();
-      document.getElementById('cfg-email-subject').value = evt.emailSubject || '';
-      document.getElementById('cfg-email-body').value = evt.emailBody || '';
-
-      // Populate Staff Session Selector
-      renderStaffSessionOptions();
-    }
-
-    function switchDetailSubTab(tabName) {
-      document.getElementById('subtab-attendees').classList.add('hidden');
-      document.getElementById('subtab-config').classList.add('hidden');
-
-      document.getElementById('tab-btn-attendees').className = "pb-3 border-b-2 border-transparent hover:text-slate-800";
-      document.getElementById('tab-btn-config').className = "pb-3 border-b-2 border-transparent hover:text-slate-800";
-
-      if (tabName === 'attendees') {
-        document.getElementById('subtab-attendees').classList.remove('hidden');
-        document.getElementById('tab-btn-attendees').className = "pb-3 border-b-2 border-indigo-600 text-indigo-600 font-bold";
-      } else if (tabName === 'config') {
-        document.getElementById('subtab-config').classList.remove('hidden');
-        document.getElementById('tab-btn-config').className = "pb-3 border-b-2 border-indigo-600 text-indigo-600 font-bold";
-      }
-    }
-
-    function switchViewDetailTab(target) {
-      if (target === 'scan') showView('staff-scan');
-    }
-
-    // 8. Custom Fields Excel Import (ข้อ 3 & 5)
-    function importExcelCustomFields(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        if (json.length < 2) return alert('ไฟล์ Excel ไม่มีข้อมูล');
-
-        // ดึง หัวข้อ คอลัมน์ทั้งหมด (ยกเว้น ลำดับ)
-        const rawHeaders = json[0];
-        const dynamicFields = [];
-
-        rawHeaders.forEach(h => {
-          const cleanH = String(h || '').trim();
-          if (cleanH && !cleanH.includes('ลำดับ') && cleanH.toLowerCase() !== 'no' && cleanH.toLowerCase() !== 'no.') {
-            dynamicFields.push(cleanH);
-          }
+    // ดึงข้อมูล Realtime จาก Firebase
+    db.ref(`scanLogs/${activeEventId}`).on('value', (snapshot) => {
+      const data = snapshot.val();
+      scanLogsList = [];
+      if (data) {
+        Object.keys(data).forEach(key => {
+          scanLogsList.push({ _key: key, ...data[key] });
         });
+      }
+      renderTable();
+    });
 
-        // อัปเดต Fields เข้า Event
-        currentFields = dynamicFields.length > 0 ? dynamicFields : ["empName"];
-        db.ref(`events/${currentEventId}/fields`).set(currentFields);
-
-        // นำเข้าข้อมูล Attendees
-        const importedAttendees = {};
-        for (let i = 1; i < json.length; i++) {
-          const row = json[i];
-          if (!row || row.length === 0) continue;
-
-          const attObj = {};
-          rawHeaders.forEach((h, colIdx) => {
-            const cleanH = String(h || '').trim();
-            if (cleanH && !cleanH.includes('ลำดับ')) {
-              attObj[cleanH] = row[colIdx] !== undefined ? String(row[colIdx]).trim() : '';
-            }
-          });
-
-          // เจน ID ประจำตัว
-          const uniqueId = attObj['id'] || attObj['รหัส'] || attObj['empId'] || `ID_${Date.now().toString().slice(-4)}_${i}`;
-          attObj['_id'] = uniqueId;
-          importedAttendees[uniqueId] = attObj;
-        }
-
-        db.ref(`attendees/${currentEventId}`).set(importedAttendees, () => {
-          alert('นำเข้าข้อมูล Excel ตามหัวข้อไฟล์สำเร็จแล้ว');
-        });
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    function renderAttendeesTable() {
-      const thead = document.getElementById('attendees-table-head');
-      const tbody = document.getElementById('attendees-table-body');
-      thead.innerHTML = '';
+    function renderTable() {
+      const tbody = document.getElementById('logs-table-body');
+      const searchVal = document.getElementById('search-input').value.toLowerCase();
       tbody.innerHTML = '';
 
-      // Header Dynamic
-      let headHTML = '';
-      currentFields.forEach(f => { headHTML += `<th class="py-2.5 px-3">${f}</th>`; });
-      headHTML += `<th class="py-2.5 px-3 text-center">QR Code ประจำตัว</th>`;
-      headHTML += `<th class="py-2.5 px-3 text-center">ส่งอีเมล (Draft)</th>`;
-      thead.innerHTML = headHTML;
+      const filtered = scanLogsList.filter(item => {
+        const barcode = (item.barcode || '').toLowerCase();
+        const empId = (item.empId || '').toLowerCase();
+        const empName = (item.empName || '').toLowerCase();
+        return barcode.includes(searchVal) || empId.includes(searchVal) || empName.includes(searchVal);
+      });
 
-      // Rows
-      Object.values(currentAttendees).forEach(att => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition";
-        let rowHTML = '';
-        
-        currentFields.forEach(f => {
-          rowHTML += `<td class="py-2.5 px-3 font-medium text-slate-800">${att[f] || '-'}</td>`;
-        });
+      document.getElementById('total-count').innerText = filtered.length;
 
-        const qrId = att._id || att.empId || 'NO_ID';
-        const userEmail = att.email || att['อีเมล'] || '';
-
-        rowHTML += `<td class="py-2.5 px-3 text-center"><div id="qr-att-${qrId}" class="flex justify-center"></div></td>`;
-        rowHTML += `
-          <td class="py-2.5 px-3 text-center">
-            <button onclick="openMailDraft('${userEmail}', '${att[currentFields[0]] || ''}', '${qrId}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition">
-              ✉️ ดราฟอีเมล
-            </button>
+      const reversed = [...filtered].reverse();
+      reversed.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-slate-50 transition";
+        row.innerHTML = `
+          <td class="py-3 px-4 text-slate-400">${filtered.length - index}</td>
+          <td class="py-3 px-4">${item.timestamp || '-'}</td>
+          <td class="py-3 px-4 font-semibold text-indigo-600">${item.empId || item.barcode || '-'}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${item.empName || '-'}</td>
+          <td class="py-3 px-4 text-slate-500">${item.staff || 'Admin'}</td>
+          <td class="py-3 px-4">
+            ${item.snapshot ? `<img src="${item.snapshot}" class="w-12 h-8 object-cover rounded border border-slate-200">` : '-'}
           </td>
         `;
-        tr.innerHTML = rowHTML;
-        tbody.appendChild(tr);
-
-        setTimeout(() => {
-          const box = document.getElementById(`qr-att-${qrId}`);
-          if (box && !box.hasChildNodes()) {
-            new QRCode(box, { text: qrId, width: 36, height: 36 });
-          }
-        }, 50);
+        tbody.appendChild(row);
       });
     }
 
-    // 9. Email Draft Generation (ข้อ 5)
-    function openMailDraft(email, name, qrCodeId) {
-      let targetEmail = email;
-      if (!targetEmail) {
-        targetEmail = prompt('ไม่พบอีเมลผู้ร่วมงานท่านนี้ กรุณาระบุอีเมลเพื่อส่ง:', '');
-        if (!targetEmail) return;
-      }
-
-      const evt = eventsData[currentEventId] || {};
-      const subject = encodeURIComponent(evt.emailSubject || `QR Code สำหรับเข้าร่วมงาน ${evt.name}`);
-      let bodyText = evt.emailBody || `เรียนคุณ {name},\nรหัส QR Code ของคุณคือ {id}`;
-      bodyText = bodyText.replace('{name}', name).replace('{id}', qrCodeId);
-      const body = encodeURIComponent(bodyText);
-
-      window.open(`mailto:${targetEmail}?subject=${subject}&body=${body}`, '_blank');
-    }
-
-    function sendBulkDraftEmails() {
-      alert('ระบบเตรียมดราฟอีเมลสำหรับส่งออกเรียบร้อยแล้ว');
-    }
-
-    // 10. Sessions & Staff Access QR Code (ข้อ 2 & 4)
-    function saveNewSession() {
-      const name = document.getElementById('cfg-session-name').value.trim();
-      const date = document.getElementById('cfg-session-date').value;
-      const time = document.getElementById('cfg-session-time').value;
-
-      if (!name) return alert('กรุณากรอกชื่อรอบ');
-
-      const sessId = `SESS_${Date.now().toString().slice(-4)}`;
-      db.ref(`events/${currentEventId}/sessions/${sessId}`).set({ name, date, time }, () => {
-        document.getElementById('cfg-session-name').value = '';
-        renderSessionsConfigList();
-        renderStaffSessionOptions();
-      });
-    }
-
-    function renderSessionsConfigList() {
-      const box = document.getElementById('session-list-box');
-      box.innerHTML = '';
-      const sessions = eventsData[currentEventId]?.sessions || {};
-
-      Object.keys(sessions).forEach(sId => {
-        const s = sessions[sId];
-        box.innerHTML += `
-          <div class="py-2 flex justify-between items-center">
-            <div>
-              <p class="font-bold text-slate-800">${s.name}</p>
-              <p class="text-[10px] text-slate-400">📅 ${s.date || '-'} ⏰ ${s.time || '-'}</p>
-            </div>
-            ${sId !== 'SESS_DEFAULT' ? `<button onclick="deleteSession('${sId}')" class="text-rose-500 font-bold">🗑️</button>` : ''}
-          </div>
-        `;
-      });
-    }
-
-    function deleteSession(sId) {
-      db.ref(`events/${currentEventId}/sessions/${sId}`).remove();
-    }
-
-    function renderStaffSessionOptions() {
-      const select = document.getElementById('staff-session-selector');
-      select.innerHTML = '<option value="SESSION_ALL">-- ทุกรอบเวลารวมกัน --</option>';
-      const sessions = eventsData[currentEventId]?.sessions || {};
-
-      Object.keys(sessions).forEach(sId => {
-        const s = sessions[sId];
-        select.innerHTML += `<option value="${sId}">${s.name} (${s.date || ''})</option>`;
-      });
-    }
-
-    function openStaffAccessModal() {
-      generateStaffAccessQR();
-      document.getElementById('modal-staff-access').classList.remove('hidden');
-    }
-
-    function generateStaffAccessQR() {
-      const mode = document.getElementById('access-mode-select').value;
-      const baseUrl = window.location.href.split('?')[0];
-      const accessUrl = `${baseUrl}?event=${currentEventId}&mode=${mode}`;
-
-      const box = document.getElementById('access-qr-box');
-      box.innerHTML = '';
-      new QRCode(box, { text: accessUrl, width: 140, height: 140 });
-    }
-
-    function saveStaffOperatorName() {
-      const name = document.getElementById('staff-operator-name').value.trim();
-      if (!name) return alert('กรุณากรอกชื่อสตาฟ');
-      staffOperatorName = name;
-      closeModal('modal-staff-name');
-    }
-
-    // 11. Scanner & Attendance Logic
-    function toggleCameraFlip() {
-      const readerBox = document.getElementById('reader');
-      if (document.getElementById('chk-flip-camera').checked) readerBox.classList.add('no-mirror');
-      else readerBox.classList.remove('no-mirror');
-    }
-
+    // เริ่มกล้องสแกน
     function startScanner() {
       if (html5QrcodeScanner) return;
       html5QrcodeScanner = new Html5Qrcode("reader");
       html5QrcodeScanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => onCardScanned(decodedText)
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => { onCardScanned(decodedText); },
+        (errorMessage) => { /* ข้าม error การสแกนย่อย */ }
       );
     }
 
     function stopScanner() {
       if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop().then(() => html5QrcodeScanner = null);
+        html5QrcodeScanner.stop().then(() => {
+          html5QrcodeScanner = null;
+        });
       }
     }
 
-    function onCardScanned(barcodeText) {
+    // ดึงภาพ Snapshot ปกติ
+    function captureProcessedSnapshot() {
+      const videoElement = document.querySelector('video');
+      if (!videoElement) return { base64: '' };
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = videoElement.videoWidth || 640;
+      canvas.height = videoElement.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      return { base64: canvas.toDataURL('image/png') };
+    }
+
+    // เร่งความคมชัดภาพแบบ 2 เท่าเพื่อให้ OCR ถอดอักษรไทยได้
+    function captureHighResSnapshot(videoElement) {
+      if (!videoElement) return null;
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const scale = 2;
+      canvas.width = (videoElement.videoWidth || 640) * scale;
+      canvas.height = (videoElement.videoHeight || 480) * scale;
+      
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const contrastVal = avg < 135 ? 0 : 255;
+        data[i] = contrastVal;
+        data[i + 1] = contrastVal;
+        data[i + 2] = contrastVal;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return canvas.toDataURL('image/png');
+    }
+
+    // ฟังก์ชันประมวลผลเมื่อสแกนบัตร/หน้าจอมือถือ
+    async function onCardScanned(barcodeText) {
       if (isProcessing) return;
       isProcessing = true;
 
-      const scannedId = barcodeText ? barcodeText.trim() : "";
-      const matchedUser = currentAttendees[scannedId] || { _id: scannedId, [currentFields[0]]: 'ผู้ลงทะเบียนหน้างาน' };
+      const rawBarcode = barcodeText ? barcodeText.trim() : "";
+      const videoElement = document.querySelector('video');
+      const { base64: snapshotBase64 } = captureProcessedSnapshot();
 
-      if (staffDeviceMode === 'scan_only') {
-        db.ref(`pairings/${currentEventId}`).set({ user: matchedUser, timestamp: Date.now() });
-        alert('ส่งป๊อปอัปไปเซ็นชื่อบน iPad เรียบร้อยแล้ว');
-        setTimeout(() => { isProcessing = false; }, 2000);
-      } else {
-        openSignatureModal(matchedUser);
-        setTimeout(() => { isProcessing = false; }, 1500);
-      }
-    }
-
-    function listenIpadPairing() {
-      db.ref(`pairings/${currentEventId}`).on('value', snap => {
-        const data = snap.val();
-        if (data && data.user) {
-          document.getElementById('ipad-status-badge').innerText = `✅ ได้รับสแกน: ${data.user[currentFields[0]] || data.user._id}`;
-          openSignatureModal(data.user);
-        }
+      const timestamp = new Date().toLocaleString('th-TH', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
-    }
-
-    function openSignatureModal(user) {
-      activeUserForSign = user;
-      const primaryName = user[currentFields[0]] || user._id || 'ไม่ระบุชื่อ';
-      document.getElementById('pop-header-title').innerText = `${primaryName} (ID: ${user._id || '-'})`;
-
-      const container = document.getElementById('pop-fields-container');
-      container.innerHTML = '';
-
-      currentFields.forEach(f => {
-        container.innerHTML += `
-          <div>
-            <label class="text-[10px] font-bold text-slate-400 uppercase">${f}</label>
-            <input type="text" id="pop-input-${f}" value="${user[f] || ''}" class="w-full border rounded-lg p-1.5 font-bold text-slate-800">
-          </div>
-        `;
-      });
-
-      clearSignatureCanvas();
-      document.getElementById('modal-signature').classList.remove('hidden');
-    }
-
-    async function saveAttendanceRecord() {
-      if (signaturePad.isEmpty()) return alert('กรุณาเซ็นชื่อก่อนบันทึก');
-
-      const record = {};
-      currentFields.forEach(f => {
-        const val = document.getElementById(`pop-input-${f}`)?.value.trim();
-        record[f] = val || '';
-      });
-
-      const signatureImg = signaturePad.toDataURL();
-      const timestamp = new Date().toLocaleString('th-TH');
-      const sessionName = eventsData[currentEventId]?.sessions?.[currentSessionId]?.name || 'รอบทั่วไป';
 
       document.getElementById('result-empty').classList.add('hidden');
       document.getElementById('result-data').classList.remove('hidden');
-      document.getElementById('res-signature-img').src = signatureImg;
 
-      const detailsBox = document.getElementById('scan-result-details');
-      detailsBox.innerHTML = `
-        <p><strong>ชื่อ-นามสกุล:</strong> <span class="text-slate-900 font-bold">${record[currentFields[0]] || '-'}</span></p>
-        <p><strong>รอบเวลา:</strong> <span class="text-amber-700 font-bold">${sessionName}</span></p>
-        <p><strong>เวลาสแกน:</strong> <span>${timestamp}</span></p>
-        <p><strong>สตาฟผู้สแกน:</strong> <span>${staffOperatorName || 'Admin'}</span></p>
-      `;
+      document.getElementById('res-timestamp').innerText = timestamp;
+      document.getElementById('res-staff').innerText = currentStaffName;
+      if (snapshotBase64) document.getElementById('res-snapshot').src = snapshotBase64;
 
-      await db.ref(`scanLogs/${currentEventId}`).push({
-        ...record,
-        signature: signatureImg,
-        timestamp: timestamp,
-        sessionId: currentSessionId,
-        sessionName: sessionName,
-        staff: staffOperatorName || 'Admin'
-      });
+      const alertBadge = document.getElementById('scan-alert-badge');
 
-      closeModal('modal-signature');
-    }
+      // เช็คการสแกนซ้ำ
+      const existingEntry = scanLogsList.find(l => l.barcode === rawBarcode || l.empId === rawBarcode);
+      if (existingEntry) {
+        alertBadge.className = "py-2 px-4 rounded-xl font-bold text-sm bg-rose-100 text-rose-800 border border-rose-300 text-center";
+        alertBadge.innerHTML = `⚠️ ข้อมูลนี้ถูกสแกนไปแล้ว!<br><span class="text-xs font-normal">บันทึกเมื่อ: ${existingEntry.timestamp} โดย ${existingEntry.staff}</span>`;
+        document.getElementById('res-barcode').innerText = existingEntry.empId || rawBarcode;
+        document.getElementById('res-emp-name').innerText = `${existingEntry.empName} (รหัส: ${existingEntry.empId})`;
+        setTimeout(() => { isProcessing = false; }, 2500);
+        return;
+      }
 
-    // 12. Dashboard Filter & Export Excel/PDF (ข้อ 7)
-    function onStaffSessionChange(val) {
-      currentSessionId = val;
-      renderDashboardTable();
-    }
+      alertBadge.className = "py-2 px-4 rounded-xl font-bold text-sm bg-amber-100 text-amber-800 border border-amber-300 text-center";
+      alertBadge.innerHTML = `⏳ กำลังแกะข้อมูลชื่อและรหัสพนักงานจากหน้าจอ...`;
 
-    function renderDashboardTable() {
-      const tbody = document.getElementById('dashboard-logs-tbody');
-      const search = document.getElementById('dashboard-search').value.toLowerCase();
-      const statusFilter = document.getElementById('filter-status-select').value;
-      tbody.innerHTML = '';
+      let finalEmpId = "";
+      let finalEmpName = "";
 
-      const logsArray = Object.keys(currentLogs).map(k => currentLogs[k]);
+      try {
+        const highResImg = captureHighResSnapshot(videoElement) || snapshotBase64;
+        if (window.Tesseract && highResImg) {
+          const result = await Tesseract.recognize(highResImg, 'tha+eng');
+          const text = result.data ? result.data.text : "";
 
-      // ดึงผู้ลงทะเบียนทั้งหมดเทียบกับสแกน
-      let listToRender = [];
+          // ค้นหารหัสพนักงาน (8 หลัก เช่น 10027011)
+          const idMatch = text.match(/\b\d{8}\b/) || text.match(/\b\d{6,10}\b/);
+          if (idMatch) finalEmpId = idMatch[0];
 
-      Object.values(currentAttendees).forEach(att => {
-        const attId = att._id || att.empId;
-        const matchedLog = logsArray.find(l => (l._id === attId || l[currentFields[0]] === att[currentFields[0]]) && (currentSessionId === 'SESSION_ALL' || l.sessionId === currentSessionId));
-
-        const name = att[currentFields[0]] || '';
-        const isMatchSearch = name.toLowerCase().includes(search) || (attId && attId.toLowerCase().includes(search));
-
-        if (isMatchSearch) {
-          if (statusFilter === 'ALL' || (statusFilter === 'CHECKED_IN' && matchedLog) || (statusFilter === 'NOT_YET' && !matchedLog)) {
-            listToRender.push({
-              name: name,
-              id: attId,
-              isCheckedIn: !!matchedLog,
-              log: matchedLog
-            });
-          }
+          // ค้นหาชื่อ-นามสกุลภาษาไทย
+          const nameMatch = text.match(/([ก-๙]{2,})\s+([ก-๙]{2,})/);
+          if (nameMatch) finalEmpName = `${nameMatch[1]} ${nameMatch[2]}`;
         }
+      } catch (err) {
+        console.warn("OCR Exception:", err);
+      }
+
+      if (!finalEmpId) finalEmpId = rawBarcode || "ไม่พบรหัส";
+      if (!finalEmpName) finalEmpName = "อ่านชื่อไม่ชัดเจน (โปรดถือบัตรให้นิ่งแล้วสแกนใหม่)";
+
+      document.getElementById('res-barcode').innerText = finalEmpId;
+      alertBadge.className = "py-2 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300 text-center";
+      alertBadge.innerHTML = `✅ บันทึกเข้างานสำเร็จ!`;
+
+      document.getElementById('res-emp-name').innerText = `${finalEmpName} (รหัส: ${finalEmpId})`;
+
+      // ส่งข้อมูลเข้า Firebase
+      const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
+      await newLogRef.set({
+        barcode: rawBarcode,
+        empName: finalEmpName,
+        empId: finalEmpId,
+        timestamp: timestamp,
+        staff: currentStaffName,
+        snapshot: snapshotBase64
       });
 
-      listToRender.forEach((item, idx) => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition";
-        tr.innerHTML = `
-          <td class="py-2.5 px-3 text-slate-400">${idx + 1}</td>
-          <td class="py-2.5 px-3 font-semibold">${item.log ? item.log.timestamp : '-'}</td>
-          <td class="py-2.5 px-3 font-bold text-slate-800">${item.name}</td>
-          <td class="py-2.5 px-3">
-            ${item.isCheckedIn 
-              ? '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">✅ สแกนแล้ว</span>' 
-              : '<span class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">⏳ ยังไม่สแกน</span>'}
-          </td>
-          <td class="py-2.5 px-3">
-            ${item.log && item.log.signature ? `<img src="${item.log.signature}" class="h-6 object-contain border bg-white rounded p-0.5">` : '-'}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
+      setTimeout(() => { isProcessing = false; }, 2000);
     }
 
-    function exportExcelReport() {
-      const evt = eventsData[currentEventId] || {};
-      const logsArray = Object.keys(currentLogs).map(k => currentLogs[k]);
+    function exportToExcel() {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += "ลำดับ,เวลาสแกน,รหัสพนักงาน,ชื่อ-นามสกุล,สตาฟผู้สแกน\n";
 
-      const dataToExport = logsArray.map((l, i) => ({
-        "ลำดับ": i + 1,
-        "เวลาสแกน": l.timestamp,
-        "ชื่อ-นามสกุล": l[currentFields[0]] || '',
-        "รอบสแกน": l.sessionName || '',
-        "สตาฟผู้สแกน": l.staff || ''
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(dataToExport);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "AttendanceReport");
-      XLSX.writeFile(wb, `${evt.name}_${currentSessionId}.xlsx`);
-    }
-
-    function exportSignedPDF() {
-      const { jsPDF } = window.jspdf;
-      const pdfBox = document.getElementById('pdf-template');
-      const evt = eventsData[currentEventId] || {};
-
-      document.getElementById('pdf-header-event-name').innerText = evt.name || '';
-      document.getElementById('pdf-header-dates').innerText = `วันที่จัดงาน: ${evt.startDate || '-'} ถึง ${evt.endDate || '-'}`;
-      document.getElementById('pdf-header-session').innerText = `รอบการสแกน: ${currentSessionId}`;
-
-      const tbody = document.getElementById('pdf-table-body');
-      tbody.innerHTML = '';
-
-      const logsArray = Object.keys(currentLogs).map(k => currentLogs[k]);
-      logsArray.forEach((l, i) => {
-        tbody.innerHTML += `
-          <tr>
-            <td class="border p-2 text-center">${i + 1}</td>
-            <td class="border p-2">${l.timestamp || ''}</td>
-            <td class="border p-2 font-bold">${l[currentFields[0]] || ''}</td>
-            <td class="border p-2 text-center"><img src="${l.signature}" class="h-5 mx-auto"></td>
-          </tr>
-        `;
+      scanLogsList.forEach((item, index) => {
+        csvContent += `${index + 1},"${item.timestamp || ''}","${item.empId || item.barcode || ''}","${item.empName || ''}","${item.staff || ''}"\n`;
       });
 
-      pdfBox.classList.remove('hidden');
-      html2canvas(pdfBox).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        pdf.addImage(imgData, 'PNG', 10, 10, 190, 0);
-        pdf.save(`${evt.name}_${currentSessionId}.pdf`);
-        pdfBox.classList.add('hidden');
-      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `scan_report_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
-    // 13. Walk-in Modal
-    function openWalkinModal() {
-      const container = document.getElementById('walkin-fields-container');
-      container.innerHTML = '';
-
-      currentFields.forEach(f => {
-        container.innerHTML += `
-          <div>
-            <label class="block font-bold text-slate-500 uppercase mb-1">${f}</label>
-            <input type="text" id="walkin-input-${f}" placeholder="กรอก ${f}" class="w-full border rounded-xl p-2.5 font-bold">
-          </div>
-        `;
-      });
-
-      document.getElementById('modal-walkin').classList.remove('hidden');
-    }
-
-    function submitWalkin() {
-      const user = { _id: `WI_${Date.now().toString().slice(-4)}` };
-      currentFields.forEach(f => {
-        user[f] = document.getElementById(`walkin-input-${f}`)?.value.trim() || '';
-      });
-
-      closeModal('modal-walkin');
-      openSignatureModal(user);
-    }
-
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    // เปิดใช้งานกล้องอัตโนมัติเมื่อโหลดหน้าเว็บ
+    window.addEventListener('load', () => {
+      startScanner();
+    });
   </script>
 </body>
 </html>
