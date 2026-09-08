@@ -3,113 +3,121 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบเช็กอินอีเวนต์ & ลายเซ็นอิเล็กทรอนิกส์</title>
-  
+  <title>Dashboard & Event Check-in System</title>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Firebase App, Database, Storage (Compat Scripts) -->
+  <!-- Firebase App & Database -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
   <!-- HTML5 QR Code Scanner -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- QRCode.js Generator -->
+  <!-- QRCode Generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- SheetJS (Excel Parser) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <!-- jsPDF & html2canvas (Export PDF พร้อมลายเซ็น) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <!-- EmailJS (สำหรับส่งอีเมล QR Code) -->
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <!-- Signature Pad -->
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+  <!-- jsPDF & html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
+<body class="bg-slate-50 min-h-screen p-4 md:p-8 font-sans text-slate-800">
 
-  <!-- Navbar Navigation -->
-  <nav class="bg-indigo-700 text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
-      <div class="flex items-center gap-2">
-        <span class="text-2xl">🎫</span>
-        <h1 class="font-bold text-lg md:text-xl">Event Check-in System</h1>
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Top Navigation Bar -->
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🎪</span>
+        <div>
+          <h1 class="font-bold text-lg text-slate-800">ระบบเช็กอิน & ลายเซ็นดิจิทัล</h1>
+          <p class="text-xs text-slate-400">Event Check-in & Realtime Dashboard</p>
+        </div>
       </div>
-      <div class="flex gap-2">
-        <button onclick="switchTab('admin')" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm transition">⚙️ จัดการอีเวนต์ (Admin)</button>
-        <button onclick="switchTab('scanner')" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm transition">📷 หน้าสแกนหน้างาน</button>
-        <button onclick="switchTab('pad')" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 font-semibold text-sm transition">✏️ โหมด iPad เซ็นชื่อ</button>
+
+      <div class="flex flex-wrap gap-2">
+        <button onclick="switchView('admin')" id="btn-tab-admin" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow transition">⚙️ จัดการอีเวนต์ (Admin)</button>
+        <button onclick="switchView('staff')" id="btn-tab-staff" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition">📷 หน้าสแกนสตาฟ</button>
+        <button onclick="switchView('ipad')" id="btn-tab-ipad" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow transition">✏️ โหมด iPad เซ็นชื่อ</button>
       </div>
     </div>
-  </nav>
 
-  <main class="max-w-7xl mx-auto p-4 md:p-6">
-
-    <!-- =================================================== -->
-    <!-- 1. TAB: ADMIN & MANAGING DATA                       -->
-    <!-- =================================================== -->
-    <section id="tab-admin" class="space-y-6">
+    <!-- ================================================================= -->
+    <!-- SECTION 1: ADMIN (จัดการอีเวนต์ / นำเข้ารายชื่อ / เจน QR Code)    -->
+    <!-- ================================================================= -->
+    <section id="view-admin" class="space-y-6">
       
-      <!-- เพิ่มอีเวนต์ & อัปโหลด Excel -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h2 class="font-bold text-lg text-slate-900 border-b pb-2">1. นำเข้าฐานข้อมูลผู้เข้าร่วมงาน (Excel)</h2>
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 mb-1">ชื่ออีเวนต์</label>
-              <input type="text" id="event-name" placeholder="เช่น สัมมนาวิชาการ 2026" class="w-full border rounded-xl p-2.5 text-sm">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 mb-1">เลือกไฟล์ Excel (.xlsx / .csv)</label>
-              <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" class="w-full border rounded-xl p-2 text-sm bg-slate-50">
-              <p class="text-xs text-slate-400 mt-1">* รูปแบบคอลัมน์ใน Excel: <strong>empId, empName, email, position</strong></p>
-            </div>
-            <button onclick="importExcel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition">อัปโหลดฐานข้อมูล</button>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- เลือก/สร้าง อีเวนต์ -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <h2 class="font-bold text-base text-slate-800 border-b pb-2">1. เลือกหรือสร้างอีเวนต์</h2>
+          <div>
+            <label class="block text-xs font-bold text-slate-400 mb-1">เลือกอีเวนต์ที่ต้องการจัดการ</label>
+            <select id="event-selector" onchange="changeActiveEvent()" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 font-bold text-indigo-600">
+              <!-- Render Event List -->
+            </select>
+          </div>
+
+          <div class="pt-2 border-t space-y-2">
+            <label class="block text-xs font-bold text-slate-400">สร้างอีเวนต์ใหม่</label>
+            <input type="text" id="new-event-name" placeholder="ชื่ออีเวนต์ เช่น Seminar 2026" class="w-full border border-slate-200 rounded-xl p-2 text-sm">
+            <button onclick="createNewEvent()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-xl text-sm transition">+ เพิ่มอีเวนต์</button>
           </div>
         </div>
 
-        <!-- โหมดการจับคู่อุปกรณ์ (Device Pairing Mode) -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h2 class="font-bold text-lg text-slate-900 border-b pb-2">2. การเชื่อมต่อจับคู่อุปกรณ์ (Device Pairing)</h2>
-          <div class="space-y-3 text-sm">
-            <p class="text-slate-600">เลือกลักษณะการทำงานของระบบสแกนและเซ็นชื่อ:</p>
-            <div class="space-y-2">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="pairing-mode" value="single" checked onchange="togglePairingMode()" class="w-4 h-4 text-indigo-600">
-                <span><strong>อุปกรณ์เดียว (Single Device):</strong> สแกนและขึ้นป๊อปอัปเซ็นชื่อในเครื่องเดียว</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="pairing-mode" value="paired" onchange="togglePairingMode()" class="w-4 h-4 text-indigo-600">
-                <span><strong>แยกสองเครื่อง (Pair Device):</strong> สแกนจากคอม/มือถือ แล้วป๊อปอัปเซ็นชื่อไปเด้งที่ iPad</span>
-              </label>
-            </div>
-            <div id="pairing-code-box" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
-              <p class="text-xs text-amber-800 font-bold">รหัสห้องจับคู่ (Pairing Session ID):</p>
-              <input type="text" id="session-id" value="SESSION_001" class="w-full font-mono font-bold text-slate-800 bg-white border p-2 rounded-lg text-center">
-              <p class="text-xs text-slate-500">* ให้เปิดเครื่อง iPad แล้วเลือกแท็บ "โหมด iPad เซ็นชื่อ" พร้อมใส่รหัสห้องนี้</p>
-            </div>
+        <!-- นำเข้า Excel -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <h2 class="font-bold text-base text-slate-800 border-b pb-2">2. นำเข้าฐานข้อมูลรายชื่อ (Excel)</h2>
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-400">ไฟล์ Excel (.xlsx / .csv)</label>
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="w-full border border-slate-200 rounded-xl p-2 text-sm bg-slate-50">
+            <p class="text-xs text-slate-400">* คอลัมน์ที่รองรับ: empId, empName, email</p>
+          </div>
+          <button onclick="importExcelData()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow">📥 นำเข้าฐานข้อมูล</button>
+        </div>
+
+        <!-- ตั้งค่า Pairing iPad -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <h2 class="font-bold text-base text-slate-800 border-b pb-2">3. ตั้งค่าการสแกน & iPad</h2>
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pair-mode-choice" value="single" checked onchange="updatePairingModeUI()" class="text-indigo-600">
+              <span><strong>สแกน + เซ็นในเครื่องเดียว</strong></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="pair-mode-choice" value="paired" onchange="updatePairingModeUI()" class="text-indigo-600">
+              <span><strong>แยกเครื่อง (สแกน ➔ เซ็นบน iPad)</strong></span>
+            </label>
+          </div>
+
+          <div id="pairing-code-box" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+            <p class="text-xs font-bold text-amber-800">รหัสห้องจับคู่ (Pairing Code):</p>
+            <input type="text" id="pairing-code-input" value="ROOM_01" class="w-full font-mono font-bold text-center border rounded-lg p-1.5 bg-white text-indigo-600">
           </div>
         </div>
       </div>
 
-      <!-- รายชื่อผู้ลงทะเบียน & ตัวจัดการสแกน/ส่งอีเมล -->
-      <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
+      <!-- ตารางแสดงผู้ลงทะเบียน & เจน QR Code -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
         <div class="flex flex-wrap justify-between items-center gap-4">
-          <h2 class="font-bold text-lg text-slate-900">รายชื่อผู้เข้าร่วมงาน & QR Code ประจำตัว</h2>
-          <button onclick="sendBulkEmail()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition">✉️ ส่งอีเมล QR Code ทุกคน</button>
+          <h2 class="text-lg font-bold text-slate-800">รายชื่อผู้ลงทะเบียนล่วงหน้า & QR Code ประจำตัว</h2>
+          <button onclick="sendBulkEmail()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-xl shadow transition">✉️ ส่งอีเมล QR Code ทั้งหมด</button>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse text-sm">
             <thead>
-              <tr class="border-b bg-slate-50 text-slate-500 font-bold">
-                <th class="p-3">รหัส</th>
-                <th class="p-3">ชื่อ-นามสกุล</th>
-                <th class="p-3">อีเมล</th>
-                <th class="p-3 text-center">QR Code</th>
-                <th class="p-3 text-center">จัดการ</th>
+              <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase">
+                <th class="py-3 px-4">รหัสพนักงาน</th>
+                <th class="py-3 px-4">ชื่อ-นามสกุล</th>
+                <th class="py-3 px-4">อีเมล</th>
+                <th class="py-3 px-4 text-center">QR Code</th>
+                <th class="py-3 px-4 text-center">จัดการ</th>
               </tr>
             </thead>
-            <tbody id="attendee-table-body" class="divide-y">
-              <!-- Render attendee rows -->
+            <tbody id="admin-attendee-table" class="divide-y divide-slate-100 font-medium">
+              <!-- Render attendee list -->
             </tbody>
           </table>
         </div>
@@ -117,145 +125,200 @@
 
     </section>
 
+    <!-- ================================================================= -->
+    <!-- SECTION 2: STAFF SCANNER & DASHBOARD (คง UI/UX เดิมไว้ทั้งหมด)   -->
+    <!-- ================================================================= -->
+    <section id="view-staff" class="hidden space-y-6">
 
-    <!-- =================================================== -->
-    <!-- 2. TAB: SCANNER & DASHBOARD                        -->
-    <!-- =================================================== -->
-    <section id="tab-scanner" class="hidden space-y-6">
-      
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Section: กล้องและผลลัพธ์การสแกน (UI เดิม) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
         <!-- กล้องสแกน -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h2 class="font-bold text-lg text-slate-900 border-b pb-2">📷 สแกน QR Code หน้างาน</h2>
-          <div id="reader" class="w-full aspect-square bg-black rounded-xl overflow-hidden"></div>
-          <button onclick="openWalkInModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl transition text-sm">+ ลงทะเบียน Walk-in หน้างาน</button>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-between space-y-4">
+          <div class="w-full relative overflow-hidden rounded-xl bg-black aspect-video flex items-center justify-center">
+            <div id="reader" class="w-full h-full"></div>
+          </div>
+          
+          <div class="flex gap-4 w-full">
+            <button id="btn-start" onclick="startScanner()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
+              เปิดกล้องสแกน
+            </button>
+            <button id="btn-stop" onclick="stopScanner()" class="flex-1 bg-rose-400 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
+              ปิดกล้อง
+            </button>
+          </div>
+
+          <button onclick="openWalkinModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl shadow text-sm transition">
+            + เพิ่มลงทะเบียนหน้างาน (Walk-in)
+          </button>
         </div>
 
-        <!-- Dashboard เรียลไทม์ -->
-        <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-2">
-            <h2 class="font-bold text-lg text-slate-900">📊 Dashboard รายชื่อผู้ลงชื่อเข้างาน</h2>
-            <button onclick="exportSignedPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition">📄 ดาวน์โหลดใบเซ็นชื่อ PDF</button>
+        <!-- ส่วนแสดงผลสถานะการสแกนล่าสุด (UI เดิม) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
+          <div id="result-empty" class="text-center text-slate-400 py-12">
+            <p class="text-lg font-medium">พร้อมสแกนข้อมูล</p>
+            <p class="text-sm">กรุณาส่อง QR Code ประจำตัวผู้เข้าร่วมงาน</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div class="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
-              <p class="text-xs font-bold text-emerald-600">เช็กอินแล้ว</p>
-              <p id="count-checkedin" class="text-2xl font-black text-emerald-700">0</p>
+          <div id="result-data" class="hidden space-y-4">
+            <div id="scan-alert-badge" class="py-2 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300 text-center">
+              ✅ สแกนสำเร็จ!
             </div>
-            <div class="p-4 bg-amber-50 border border-amber-100 rounded-xl text-center">
-              <p class="text-xs font-bold text-amber-600">ยังไม่ลงชื่อ</p>
-              <p id="count-pending" class="text-2xl font-black text-amber-700">0</p>
-            </div>
-          </div>
 
-          <!-- ตารางผู้เข้างาน -->
-          <div class="overflow-x-auto max-h-96">
-            <table class="w-full text-left border-collapse text-sm">
-              <thead class="sticky top-0 bg-slate-100 text-slate-600">
-                <tr>
-                  <th class="p-2.5">เวลา</th>
-                  <th class="p-2.5">รหัส</th>
-                  <th class="p-2.5">ชื่อ-นามสกุล</th>
-                  <th class="p-2.5">ลายเซ็น</th>
-                  <th class="p-2.5 text-center">แก้ไข</th>
-                </tr>
-              </thead>
-              <tbody id="dashboard-table-body" class="divide-y">
-                <!-- Render dashboard list -->
-              </tbody>
-            </table>
+            <div class="space-y-2 text-sm text-slate-600">
+              <p><strong>รหัสผู้สแกน:</strong> <span id="res-barcode" class="text-indigo-600 font-bold"></span></p>
+              <p><strong>ชื่อ-นามสกุล:</strong> <span id="res-emp-name" class="text-slate-900 font-bold"></span></p>
+              <p><strong>เวลาสแกน:</strong> <span id="res-timestamp"></span></p>
+              <p><strong>สตาฟผู้สแกน:</strong> <span id="res-staff">Admin</span></p>
+            </div>
+
+            <div class="pt-2">
+              <p class="text-xs font-bold text-slate-400 mb-1">ลายเซ็นเข้างาน</p>
+              <img id="res-signature-img" src="" alt="Signature" class="h-16 object-contain rounded-lg border border-slate-200 bg-slate-50 p-1">
+            </div>
           </div>
         </div>
+
+      </div>
+
+      <!-- Section: Dashboard รายชื่อ (UI เดิม) -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+        
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+              Dashboard รายชื่อผู้สแกนเข้างาน
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">ข้อมูลเรียลไทม์ประจำอีเวนต์นี้</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button onclick="exportSignedPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow transition">
+              📄 ใบเซ็นชื่อ PDF
+            </button>
+            
+            <span class="bg-indigo-50 text-indigo-700 text-sm font-bold py-2 px-4 rounded-xl">
+              เช็กอินแล้ว: <span id="total-count">0</span> คน
+            </span>
+
+            <input type="text" id="search-input" onkeyup="renderDashboardTable()" placeholder="ค้นหารหัส/ชื่อ..." class="border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none w-48 md:w-64">
+          </div>
+        </div>
+
+        <!-- ตาราง Dashboard (UI เดิม + ปุ่มแก้ไข) -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase">
+                <th class="py-3 px-4">ลำดับ</th>
+                <th class="py-3 px-4">เวลาสแกน</th>
+                <th class="py-3 px-4">รหัส</th>
+                <th class="py-3 px-4">ชื่อ-นามสกุล</th>
+                <th class="py-3 px-4">ลายเซ็น</th>
+                <th class="py-3 px-4 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+              <!-- Realtime Dashboard Data -->
+            </tbody>
+          </table>
+        </div>
+
       </div>
 
     </section>
 
-
-    <!-- =================================================== -->
-    <!-- 3. TAB: IPAD SIGNATURE PAD STANDALONE               -->
-    <!-- =================================================== -->
-    <section id="tab-pad" class="hidden min-h-[80vh] flex flex-col items-center justify-center">
-      <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-xl text-center space-y-6">
+    <!-- ================================================================= -->
+    <!-- SECTION 3: IPAD SIGNATURE STANDALONE                              -->
+    <!-- ================================================================= -->
+    <section id="view-ipad" class="hidden min-h-[75vh] flex flex-col items-center justify-center">
+      <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-lg text-center space-y-6 border border-slate-100">
         <span class="text-5xl">✏️</span>
-        <h2 class="text-2xl font-bold text-slate-900">โหมด iPad รับลายเซ็นเข้างาน</h2>
-        <p class="text-slate-500 text-sm">เมื่อมีการสแกน QR Code จากเครื่องสแกน ป๊อปอัปจะแสดงขึ้นบนหน้าจอนี้อัตโนมัติ</p>
+        <h2 class="text-2xl font-bold text-slate-800">โหมด iPad รับลายเซ็นเข้างาน</h2>
+        <p class="text-slate-500 text-sm">เมื่อสตาฟสแกน QR Code หน้าจอจะเด้งป๊อปอัปให้ผู้เข้าร่วมงานเซ็นชื่อทันที</p>
+        
         <div class="p-4 bg-slate-50 rounded-2xl border text-left space-y-2">
-          <label class="text-xs font-bold text-slate-500">Pairing Session ID:</label>
-          <input type="text" id="pad-session-id" value="SESSION_001" onchange="listenPairingEvents()" class="w-full p-2 border rounded-xl font-mono text-center font-bold">
+          <label class="text-xs font-bold text-slate-400">ระบุ Pairing Code (ให้ตรงกับเครื่องสแกน):</label>
+          <input type="text" id="ipad-room-code" value="ROOM_01" onchange="listenIpadPairing()" class="w-full p-2.5 border rounded-xl font-mono text-center font-bold text-indigo-600 bg-white">
         </div>
-        <div id="pad-status" class="py-2 px-4 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold">
-          ⏳ กำลังรอสัญญาณจากเครื่องสแกน...
+
+        <div id="ipad-status-badge" class="py-2.5 px-4 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold">
+          ⏳ กำลังรอการสแกนจากเครื่องสตาฟ...
         </div>
       </div>
     </section>
 
-  </main>
+  </div>
 
 
-  <!-- =================================================== -->
-  <!-- MODALS                                              -->
-  <!-- =================================================== -->
+  <!-- ================================================================= -->
+  <!-- MODALS & POPUPS                                                  -->
+  <!-- ================================================================= -->
 
-  <!-- Popup Modal: ป๊อปอัปเซ็นชื่อ & แก้ไขข้อมูล -->
+  <!-- Modal: ป๊อปอัปเซ็นชื่อ & แก้ไขข้อมูล (มี Header บอกชื่อชัดเจน) -->
   <div id="modal-signature" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-lg text-slate-900">ลงนามเข้างาน & ยืนยันข้อมูล</h3>
-        <button onclick="closeModal('modal-signature')" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden space-y-0">
+      
+      <!-- Header ระบุชื่อผู้เซ็นชื่อชัดเจนเสมอ -->
+      <div class="bg-indigo-600 p-4 text-white flex justify-between items-center">
+        <div>
+          <p class="text-xs text-indigo-200 uppercase font-bold">ช่องเซ็นชื่อผู้เข้าร่วมงาน</p>
+          <h3 id="pop-header-title" class="font-bold text-lg">คุณ...</h3>
+        </div>
+        <button onclick="closeModal('modal-signature')" class="text-white/80 hover:text-white font-bold text-xl">✕</button>
       </div>
 
-      <div class="space-y-3 text-sm">
-        <div>
-          <label class="text-xs font-bold text-slate-400">รหัสพนักงาน</label>
-          <input type="text" id="pop-emp-id" class="w-full border rounded-xl p-2">
+      <div class="p-6 space-y-4">
+        <!-- ช่องข้อมูลสำหรับตรวจสอบ/แก้ไข -->
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <label class="text-xs font-bold text-slate-400">รหัสพนักงาน</label>
+            <input type="text" id="pop-emp-id" class="w-full border rounded-xl p-2 font-mono font-bold text-indigo-600">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-400">ชื่อ-นามสกุล</label>
+            <input type="text" id="pop-emp-name" class="w-full border rounded-xl p-2 font-bold">
+          </div>
         </div>
+
+        <!-- Canvas ช่องเซ็นชื่อ -->
         <div>
-          <label class="text-xs font-bold text-slate-400">ชื่อ-นามสกุล</label>
-          <input type="text" id="pop-emp-name" class="w-full border rounded-xl p-2 font-bold">
+          <label class="block text-xs font-bold text-slate-500 mb-1">กรุณาเซ็นชื่อด้านล่างนี้ (Signature)</label>
+          <div class="border-2 border-dashed border-indigo-200 rounded-2xl bg-slate-50 overflow-hidden">
+            <canvas id="signature-canvas" class="w-full h-44 touch-none"></canvas>
+          </div>
+          <button onclick="clearSignatureCanvas()" class="mt-1 text-xs text-rose-500 hover:underline font-bold">ล้างลายเซ็น</button>
         </div>
-        <div>
-          <label class="text-xs font-bold text-slate-400">อีเมล / ตำแหน่ง</label>
-          <input type="text" id="pop-emp-email" class="w-full border rounded-xl p-2">
-        </div>
+
+        <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
+          ✅ ยืนยันและบันทึกเข้างาน
+        </button>
       </div>
 
-      <div>
-        <label class="block text-xs font-bold text-slate-500 mb-1">ลายเซ็นดิจิทัล (Sign Here)</label>
-        <div class="border-2 border-dashed border-indigo-200 rounded-2xl bg-slate-50 overflow-hidden">
-          <canvas id="signature-canvas" class="w-full h-44 touch-none"></canvas>
-        </div>
-        <button onclick="clearSignature()" class="mt-1 text-xs text-rose-500 hover:underline">ล้างลายเซ็น</button>
-      </div>
-
-      <div class="flex gap-3">
-        <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">บันทึกข้อมูลเข้างาน</button>
-      </div>
     </div>
   </div>
 
-  <!-- Popup Modal: Walk-in Registration -->
+  <!-- Modal: ลงทะเบียน Walk-in -->
   <div id="modal-walkin" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-lg text-slate-900">ลงทะเบียน Walk-in หน้างาน</h3>
+        <h3 class="font-bold text-lg text-slate-800">ลงทะเบียน Walk-in หน้างาน</h3>
         <button onclick="closeModal('modal-walkin')" class="text-slate-400 font-bold">✕</button>
       </div>
       <div class="space-y-3 text-sm">
         <input type="text" id="walkin-id" placeholder="รหัสพนักงาน / ID" class="w-full border rounded-xl p-2.5">
-        <input type="text" id="walkin-name" placeholder="ชื่อ-นามสกุล" class="w-full border rounded-xl p-2.5">
-        <input type="email" id="walkin-email" placeholder="อีเมล" class="w-full border rounded-xl p-2.5">
+        <input type="text" id="walkin-name" placeholder="ชื่อ-นามสกุล" class="w-full border rounded-xl p-2.5 font-bold">
+        <input type="email" id="walkin-email" placeholder="อีเมล (ถ้ามี)" class="w-full border rounded-xl p-2.5">
       </div>
-      <button onclick="submitWalkin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition">ถัดไป: เซ็นชื่อ</button>
+      <button onclick="submitWalkin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition">ถัดไป: ไปหน้าเซ็นชื่อ</button>
     </div>
   </div>
 
-
-  <!-- Template สำหรับ Export PDF ใบเซ็นชื่อ -->
+  <!-- Template สำหรับ Export PDF -->
   <div id="pdf-template" class="hidden p-8 bg-white text-slate-900 space-y-4">
     <div class="text-center border-b pb-4">
-      <h2 class="text-2xl font-bold">ใบลงชื่อเข้าร่วมงาน / Attendance Sheet</h2>
-      <p id="pdf-event-title" class="text-sm text-slate-500"></p>
+      <h2 class="text-2xl font-bold">ใบลงชื่อเข้าร่วมงาน (Attendance Sheet)</h2>
+      <p id="pdf-event-name" class="text-sm text-slate-500"></p>
     </div>
     <table class="w-full border-collapse border border-slate-300 text-sm">
       <thead>
@@ -264,47 +327,51 @@
           <th class="border p-2">เวลา</th>
           <th class="border p-2">รหัส</th>
           <th class="border p-2">ชื่อ-นามสกุล</th>
-          <th class="border p-2">ลายเซ็น</th>
+          <th class="border p-2 text-center">ลายเซ็น</th>
         </tr>
       </thead>
-      <tbody id="pdf-table-body">
-      </tbody>
+      <tbody id="pdf-table-body"></tbody>
     </table>
   </div>
 
 
-  <!-- =================================================== -->
-  <!-- JAVASCRIPT LOGIC                                   -->
-  <!-- =================================================== -->
+  <!-- ================================================================= -->
+  <!-- JAVASCRIPT SYSTEM LOGIC                                          -->
+  <!-- ================================================================= -->
   <script>
-    // 1. Firebase Configuration (ใส่ Config ของคุณได้ที่นี่)
+    // 1. Config Firebase
     const firebaseConfig = {
       databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com"
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. Global Variables
-    let currentEventId = "EVENT_2026";
+    // 2. Global State Variables
+    let activeEventId = "EVENT_DEFAULT";
+    let eventsList = ["EVENT_DEFAULT"];
     let attendees = {};
-    let signaturePad = null;
+    let scanLogsList = [];
     let html5QrcodeScanner = null;
-    let activeScannedUser = null;
+    let signaturePad = null;
+    let isProcessing = false;
+    let currentStaffName = "Admin";
+    let activeUserForSign = null;
 
-    // 3. Init System
+    // 3. System Initialization
     window.onload = () => {
       initSignaturePad();
-      loadAttendees();
-      listenPairingEvents();
+      loadEventsFromFirebase();
+      listenIpadPairing();
     };
 
-    function switchTab(tabName) {
-      document.getElementById('tab-admin').classList.add('hidden');
-      document.getElementById('tab-scanner').classList.add('hidden');
-      document.getElementById('tab-pad').classList.add('hidden');
-      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+    function switchView(viewName) {
+      document.getElementById('view-admin').classList.add('hidden');
+      document.getElementById('view-staff').classList.add('hidden');
+      document.getElementById('view-ipad').classList.add('hidden');
+      
+      document.getElementById(`view-${viewName}`).classList.remove('hidden');
 
-      if (tabName === 'scanner') startScanner();
+      if (viewName === 'staff') startScanner();
       else stopScanner();
     }
 
@@ -313,16 +380,67 @@
       signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(248, 250, 252)' });
     }
 
-    function clearSignature() {
+    function clearSignatureCanvas() {
       if (signaturePad) signaturePad.clear();
     }
 
-    // 4. Excel Import Logic
-    function importExcel() {
-      const fileInput = document.getElementById('excel-file');
-      const eventName = document.getElementById('event-name').value.trim();
-      if (eventName) currentEventId = eventName.replace(/\s+/g, '_');
+    // 4. Multi-Event Management
+    function loadEventsFromFirebase() {
+      db.ref('eventsList').on('value', snapshot => {
+        const data = snapshot.val();
+        if (data) eventsList = Object.keys(data);
+        renderEventSelector();
+        bindEventData();
+      });
+    }
 
+    function renderEventSelector() {
+      const selector = document.getElementById('event-selector');
+      selector.innerHTML = '';
+      eventsList.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e;
+        opt.innerText = e;
+        if (e === activeEventId) opt.selected = true;
+        selector.appendChild(opt);
+      });
+    }
+
+    function changeActiveEvent() {
+      activeEventId = document.getElementById('event-selector').value;
+      bindEventData();
+    }
+
+    function createNewEvent() {
+      const name = document.getElementById('new-event-name').value.trim();
+      if (!name) return alert('กรุณากรอกชื่ออีเวนต์');
+      const eventKey = name.replace(/\s+/g, '_');
+      db.ref(`eventsList/${eventKey}`).set(true);
+      activeEventId = eventKey;
+      document.getElementById('new-event-name').value = '';
+    }
+
+    function bindEventData() {
+      // ดึงรายชื่อผู้ลงทะเบียนล่วงหน้า
+      db.ref(`events/${activeEventId}/attendees`).on('value', snapshot => {
+        attendees = snapshot.val() || {};
+        renderAdminAttendeeTable();
+      });
+
+      // ดึงข้อมูล Logs สแกนเข้างาน Realtime
+      db.ref(`scanLogs/${activeEventId}`).on('value', snapshot => {
+        const data = snapshot.val();
+        scanLogsList = [];
+        if (data) {
+          Object.keys(data).forEach(k => scanLogsList.push({ _key: k, ...data[k] }));
+        }
+        renderDashboardTable();
+      });
+    }
+
+    // 5. Excel Import & Admin QR Generation
+    function importExcelData() {
+      const fileInput = document.getElementById('excel-file-input');
       if (!fileInput.files.length) return alert('กรุณาเลือกไฟล์ Excel');
 
       const reader = new FileReader();
@@ -333,59 +451,50 @@
         const json = XLSX.utils.sheet_to_json(sheet);
 
         json.forEach(row => {
-          const empId = row.empId || row.รหัส || `EMP_${Math.floor(Math.random()*10000)}`;
+          const empId = String(row.empId || row.รหัส || `EMP_${Math.floor(Math.random()*10000)}`);
           attendees[empId] = {
-            empId: String(empId),
+            empId: empId,
             empName: row.empName || row.ชื่อ || 'ไม่ระบุชื่อ',
             email: row.email || row.อีเมล || '',
-            position: row.position || '',
             checkedIn: false
           };
         });
 
-        db.ref(`events/${currentEventId}/attendees`).set(attendees);
+        db.ref(`events/${activeEventId}/attendees`).set(attendees);
         alert('นำเข้าฐานข้อมูลเรียบร้อยแล้ว!');
       };
       reader.readAsArrayBuffer(fileInput.files[0]);
     }
 
-    function loadAttendees() {
-      db.ref(`events/${currentEventId}/attendees`).on('value', snapshot => {
-        attendees = snapshot.val() || {};
-        renderAttendeeTable();
-        renderDashboard();
-      });
-    }
-
-    function renderAttendeeTable() {
-      const tbody = document.getElementById('attendee-table-body');
+    function renderAdminAttendeeTable() {
+      const tbody = document.getElementById('admin-attendee-table');
       tbody.innerHTML = '';
       Object.values(attendees).forEach(att => {
         const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition";
         tr.innerHTML = `
-          <td class="p-3 font-semibold text-indigo-600">${att.empId}</td>
-          <td class="p-3 font-bold">${att.empName}</td>
-          <td class="p-3 text-slate-500">${att.email || '-'}</td>
-          <td class="p-3 text-center"><div id="qr-${att.empId}" class="flex justify-center"></div></td>
-          <td class="p-3 text-center">
-            <button onclick="sendSingleEmail('${att.empId}')" class="text-xs bg-slate-100 hover:bg-slate-200 p-2 rounded-lg font-bold">✉️ ส่ง QR</button>
+          <td class="py-3 px-4 font-semibold text-indigo-600">${att.empId}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${att.empName}</td>
+          <td class="py-3 px-4 text-slate-500">${att.email || '-'}</td>
+          <td class="py-3 px-4"><div id="admin-qr-${att.empId}" class="flex justify-center"></div></td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="sendSingleEmail('${att.empId}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-bold">✉️ ส่งอีเมล QR</button>
           </td>
         `;
         tbody.appendChild(tr);
 
-        // Generate QR Code
         setTimeout(() => {
-          const qrBox = document.getElementById(`qr-${att.empId}`);
-          if (qrBox && !qrBox.hasChildNodes()) {
-            new QRCode(qrBox, { text: att.empId, width: 48, height: 48 });
+          const box = document.getElementById(`admin-qr-${att.empId}`);
+          if (box && !box.hasChildNodes()) {
+            new QRCode(box, { text: att.empId, width: 44, height: 44 });
           }
-        }, 100);
+        }, 50);
       });
     }
 
-    // 5. Scanner & Pairing Logic
-    function togglePairingMode() {
-      const isPaired = document.querySelector('input[name="pairing-mode"]:checked').value === 'paired';
+    // 6. Scanner & Device Pairing Logic
+    function updatePairingModeUI() {
+      const isPaired = document.querySelector('input[name="pair-mode-choice"]:checked').value === 'paired';
       document.getElementById('pairing-code-box').classList.toggle('hidden', !isPaired);
     }
 
@@ -394,8 +503,8 @@
       html5QrcodeScanner = new Html5Qrcode("reader");
       html5QrcodeScanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 220 },
-        (decodedText) => handleQrScanned(decodedText)
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => onCardScanned(decodedText)
       );
     }
 
@@ -405,112 +514,136 @@
       }
     }
 
-    function handleQrScanned(scannedId) {
-      const user = attendees[scannedId] || { empId: scannedId, empName: 'ผู้ลงทะเบียน Walk-in', email: '' };
-      activeScannedUser = user;
+    function onCardScanned(barcodeText) {
+      if (isProcessing) return;
+      isProcessing = true;
 
-      const isPaired = document.querySelector('input[name="pairing-mode"]:checked')?.value === 'paired';
-      
+      const rawBarcode = barcodeText ? barcodeText.trim() : "";
+      const matchedUser = attendees[rawBarcode] || { empId: rawBarcode, empName: 'ผู้ลงทะเบียนหน้างาน', email: '' };
+
+      const isPaired = document.querySelector('input[name="pair-mode-choice"]:checked')?.value === 'paired';
+
       if (isPaired) {
-        const sessionId = document.getElementById('session-id').value;
-        db.ref(`pairings/${sessionId}`).set({
-          user: user,
+        const roomCode = document.getElementById('pairing-code-input').value;
+        db.ref(`pairings/${roomCode}`).set({
+          user: matchedUser,
           timestamp: Date.now()
         });
-        alert(`ส่งข้อมูลไปเซ็นชื่อที่ iPad (Session: ${sessionId}) แล้ว`);
+        alert(`ส่งป๊อปอัปเซ็นชื่อไปที่ iPad (รหัสห้อง: ${roomCode}) เรียบร้อยแล้ว`);
+        setTimeout(() => { isProcessing = false; }, 2000);
       } else {
-        openSignatureModal(user);
+        openSignatureModal(matchedUser);
+        setTimeout(() => { isProcessing = false; }, 1500);
       }
     }
 
-    function listenPairingEvents() {
-      const sessionId = document.getElementById('pad-session-id').value;
-      db.ref(`pairings/${sessionId}`).on('value', snapshot => {
-        const val = snapshot.val();
-        if (val && val.user) {
-          activeScannedUser = val.user;
-          document.getElementById('pad-status').innerText = `✅ ได้รับข้อมูลจากสแกนเนอร์: ${val.user.empName}`;
-          openSignatureModal(val.user);
+    function listenIpadPairing() {
+      const roomCode = document.getElementById('ipad-room-code').value;
+      db.ref(`pairings/${roomCode}`).on('value', snapshot => {
+        const data = snapshot.val();
+        if (data && data.user) {
+          document.getElementById('ipad-status-badge').innerText = `✅ ได้รับข้อมูล: ${data.user.empName}`;
+          openSignatureModal(data.user);
         }
       });
     }
 
+    // 7. Modal & Signature Saving
     function openSignatureModal(user) {
+      activeUserForSign = user;
+      document.getElementById('pop-header-title').innerText = `${user.empName} (รหัส: ${user.empId})`;
       document.getElementById('pop-emp-id').value = user.empId || '';
       document.getElementById('pop-emp-name').value = user.empName || '';
-      document.getElementById('pop-emp-email').value = user.email || '';
-      clearSignature();
+      clearSignatureCanvas();
       document.getElementById('modal-signature').classList.remove('hidden');
     }
 
-    function saveAttendanceRecord() {
-      if (signaturePad.isEmpty()) return alert('กรุณาเซ็นลายเซ็นก่อนบันทึก');
+    async function saveAttendanceRecord() {
+      if (signaturePad.isEmpty()) return alert('กรุณาเซ็นชื่อก่อนบันทึก');
 
-      const empId = document.getElementById('pop-emp-id').value;
-      const empName = document.getElementById('pop-emp-name').value;
-      const signatureBase64 = signaturePad.toDataURL();
-      const timeStr = new Date().toLocaleTimeString('th-TH');
+      const finalId = document.getElementById('pop-emp-id').value.trim();
+      const finalName = document.getElementById('pop-emp-name').value.trim();
+      const signatureImg = signaturePad.toDataURL();
 
-      const record = {
-        empId,
-        empName,
-        signature: signatureBase64,
-        time: timeStr,
-        checkedIn: true
-      };
+      const timestamp = new Date().toLocaleString('th-TH', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
 
-      db.ref(`events/${currentEventId}/attendees/${empId}`).update(record);
+      // แสดงผลบน UI สแกนทันที
+      document.getElementById('result-empty').classList.add('hidden');
+      document.getElementById('result-data').classList.remove('hidden');
+      document.getElementById('res-barcode').innerText = finalId;
+      document.getElementById('res-emp-name').innerText = `${finalName} (รหัส: ${finalId})`;
+      document.getElementById('res-timestamp').innerText = timestamp;
+      document.getElementById('res-signature-img').src = signatureImg;
+
+      // บันทึกลง Firebase Database
+      const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
+      await newLogRef.set({
+        barcode: finalId,
+        empId: finalId,
+        empName: finalName,
+        signature: signatureImg,
+        timestamp: timestamp,
+        staff: currentStaffName
+      });
+
       closeModal('modal-signature');
     }
 
-    // 6. Dashboard & PDF Export
-    function renderDashboard() {
-      const tbody = document.getElementById('dashboard-table-body');
+    // 8. Render Dashboard & PDF Export
+    function renderDashboardTable() {
+      const tbody = document.getElementById('logs-table-body');
+      const searchVal = document.getElementById('search-input').value.toLowerCase();
       tbody.innerHTML = '';
 
-      let checkedInCount = 0;
-      let total = Object.keys(attendees).length;
-
-      Object.values(attendees).forEach(att => {
-        if (att.checkedIn) {
-          checkedInCount++;
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="p-2.5 text-xs text-slate-400">${att.time || '-'}</td>
-            <td class="p-2.5 font-bold text-indigo-600">${att.empId}</td>
-            <td class="p-2.5 font-bold">${att.empName}</td>
-            <td class="p-2.5"><img src="${att.signature}" class="h-8 object-contain"></td>
-            <td class="p-2.5 text-center"><button onclick="openSignatureModal(attendees['${att.empId}'])" class="text-xs bg-slate-100 p-1.5 rounded">✏️ แก้ไข</button></td>
-          `;
-          tbody.appendChild(tr);
-        }
+      const filtered = scanLogsList.filter(item => {
+        const id = (item.empId || item.barcode || '').toLowerCase();
+        const name = (item.empName || '').toLowerCase();
+        return id.includes(searchVal) || name.includes(searchVal);
       });
 
-      document.getElementById('count-checkedin').innerText = checkedInCount;
-      document.getElementById('count-pending').innerText = total - checkedInCount;
+      document.getElementById('total-count').innerText = filtered.length;
+
+      const reversed = [...filtered].reverse();
+      reversed.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-slate-50 transition";
+        row.innerHTML = `
+          <td class="py-3 px-4 text-slate-400">${filtered.length - index}</td>
+          <td class="py-3 px-4">${item.timestamp || '-'}</td>
+          <td class="py-3 px-4 font-semibold text-indigo-600">${item.empId || item.barcode || '-'}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${item.empName || '-'}</td>
+          <td class="py-3 px-4">
+            ${item.signature ? `<img src="${item.signature}" class="h-8 object-contain bg-slate-50 p-1 border rounded">` : '-'}
+          </td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="openSignatureModal({empId: '${item.empId}', empName: '${item.empName}'})" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-bold">✏️ แก้ไข</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
     }
 
     function exportSignedPDF() {
       const { jsPDF } = window.jspdf;
       const pdfBox = document.getElementById('pdf-template');
-      document.getElementById('pdf-event-title').innerText = `อีเวนต์: ${currentEventId}`;
-      
+      document.getElementById('pdf-event-name').innerText = `อีเวนต์: ${activeEventId}`;
+
       const tbody = document.getElementById('pdf-table-body');
       tbody.innerHTML = '';
 
-      let idx = 1;
-      Object.values(attendees).forEach(att => {
-        if (att.checkedIn) {
-          tbody.innerHTML += `
-            <tr>
-              <td class="border p-2 text-center">${idx++}</td>
-              <td class="border p-2">${att.time}</td>
-              <td class="border p-2">${att.empId}</td>
-              <td class="border p-2">${att.empName}</td>
-              <td class="border p-2 text-center"><img src="${att.signature}" class="h-6 mx-auto"></td>
-            </tr>
-          `;
-        }
+      scanLogsList.forEach((item, index) => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="border p-2 text-center">${index + 1}</td>
+            <td class="border p-2">${item.timestamp || ''}</td>
+            <td class="border p-2 font-bold">${item.empId || item.barcode || ''}</td>
+            <td class="border p-2">${item.empName || ''}</td>
+            <td class="border p-2 text-center"><img src="${item.signature}" class="h-6 mx-auto"></td>
+          </tr>
+        `;
       });
 
       pdfBox.classList.remove('hidden');
@@ -518,41 +651,36 @@
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         pdf.addImage(imgData, 'PNG', 10, 10, 190, 0);
-        pdf.save(`Attendance_${currentEventId}.pdf`);
+        pdf.save(`Attendance_${activeEventId}.pdf`);
         pdfBox.classList.add('hidden');
       });
     }
 
-    // 7. Walk-in & Email
-    function openWalkInModal() {
+    // 9. Walk-in & Emails
+    function openWalkinModal() {
       document.getElementById('modal-walkin').classList.remove('hidden');
     }
 
     function submitWalkin() {
       const id = document.getElementById('walkin-id').value || `WI_${Date.now().toString().slice(-4)}`;
       const name = document.getElementById('walkin-name').value;
-      const email = document.getElementById('walkin-email').value;
-
       if (!name) return alert('กรุณากรอกชื่อ-นามสกุล');
 
-      const newUser = { empId: id, empName: name, email, checkedIn: false };
-      attendees[id] = newUser;
-      db.ref(`events/${currentEventId}/attendees/${id}`).set(newUser);
-      
+      const user = { empId: id, empName: name };
       closeModal('modal-walkin');
-      openSignatureModal(newUser);
+      openSignatureModal(user);
     }
 
-    function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
     }
 
     function sendSingleEmail(empId) {
-      alert(`ส่งอีเมลแจ้ง QR Code ไปยัง ${attendees[empId]?.email || 'พนักงาน'} เรียบร้อยแล้ว`);
+      alert(`ส่งอีเมลแจ้ง QR Code ไปยัง ${attendees[empId]?.email || 'ผู้ลงทะเบียน'} เรียบร้อยแล้ว`);
     }
 
     function sendBulkEmail() {
-      alert('เริ่มส่งอีเมลพร้อม QR Code หาผู้ลงทะเบียนทุกคนเรียบร้อยแล้ว');
+      alert('เริ่มส่งอีเมลแจ้ง QR Code หาผู้ลงทะเบียนทุกคนเรียบร้อยแล้ว');
     }
   </script>
 </body>
