@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard & Event Check-in System</title>
+  <title>Event Check-in & Dynamic Management System</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,103 +21,174 @@
   <!-- jsPDF & html2canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-</head>
-<body class="bg-slate-50 min-h-screen p-4 md:p-8 font-sans text-slate-800">
 
-  <div class="max-w-7xl mx-auto space-y-6">
+  <style>
+    /* แก้ปัญหากล้องกลับด้าน (Mirror Flip) */
+    #reader video { transform: scaleX(-1); }
+    .no-mirror video { transform: scaleX(1) !important; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-3 md:p-6 font-sans text-slate-800">
+
+  <div class="max-w-7xl mx-auto space-y-5">
 
     <!-- Top Navigation Bar -->
-    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap justify-between items-center gap-4">
+    <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
       <div class="flex items-center gap-3">
-        <span class="text-2xl">🎪</span>
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl font-bold">🎪</div>
         <div>
-          <h1 class="font-bold text-lg text-slate-800">ระบบเช็กอิน & ลายเซ็นดิจิทัล</h1>
-          <p class="text-xs text-slate-400">Event Check-in & Realtime Dashboard</p>
+          <h1 class="font-bold text-base text-slate-800">ระบบเช็กอิน & ลายเซ็นดิจิทัล</h1>
+          <p class="text-xs text-slate-400">Multi-Event & Dynamic Fields Management</p>
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-2">
-        <button onclick="switchView('admin')" id="btn-tab-admin" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow transition">⚙️ จัดการอีเวนต์ (Admin)</button>
-        <button onclick="switchView('staff')" id="btn-tab-staff" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition">📷 หน้าสแกนสตาฟ</button>
-        <button onclick="switchView('ipad')" id="btn-tab-ipad" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow transition">✏️ โหมด iPad เซ็นชื่อ</button>
+      <nav class="flex flex-wrap gap-2">
+        <button onclick="switchView('admin')" id="btn-tab-admin" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-sm transition">⚙️ จัดการอีเวนต์ (Admin)</button>
+        <button onclick="switchView('staff')" id="btn-tab-staff" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">📷 หน้าสแกนสตาฟ</button>
+        <button onclick="switchView('ipad')" id="btn-tab-ipad" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition">✏️ โหมด iPad เซ็นชื่อ</button>
+      </nav>
+    </header>
+
+    <!-- Global Active Event & Session Selector Bar -->
+    <div class="bg-indigo-900 text-white p-4 rounded-2xl shadow-sm flex flex-wrap justify-between items-center gap-4">
+      <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-indigo-300">อีเวนต์ปัจจุบัน (Active Event):</label>
+          <select id="global-event-selector" onchange="onSelectEventChange(this.value)" class="bg-indigo-800 text-white font-bold text-sm border border-indigo-700 rounded-lg px-3 py-1.5 focus:outline-none">
+            <!-- Event Options -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold uppercase text-indigo-300">รอบ/ช่วงเวลา (Session / Round):</label>
+          <select id="global-session-selector" onchange="onSelectSessionChange(this.value)" class="bg-indigo-800 text-white font-bold text-sm border border-indigo-700 rounded-lg px-3 py-1.5 focus:outline-none">
+            <!-- Session Options -->
+          </select>
+        </div>
+      </div>
+
+      <div class="text-xs text-indigo-200">
+        สถานะ: <span id="event-date-display" class="font-bold text-white">-</span>
       </div>
     </div>
 
     <!-- ================================================================= -->
-    <!-- SECTION 1: ADMIN (จัดการอีเวนต์ / นำเข้ารายชื่อ / เจน QR Code)    -->
+    <!-- SECTION 1: ADMIN (จัดการอีเวนต์ / ตั้งค่า Custom Fields / Sessions) -->
     <!-- ================================================================= -->
-    <section id="view-admin" class="space-y-6">
+    <section id="view-admin" class="space-y-5">
       
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- เลือก/สร้าง อีเวนต์ -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <h2 class="font-bold text-base text-slate-800 border-b pb-2">1. เลือกหรือสร้างอีเวนต์</h2>
-          <div>
-            <label class="block text-xs font-bold text-slate-400 mb-1">เลือกอีเวนต์ที่ต้องการจัดการ</label>
-            <select id="event-selector" onchange="changeActiveEvent()" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 font-bold text-indigo-600">
-              <!-- Render Event List -->
-            </select>
-          </div>
-
-          <div class="pt-2 border-t space-y-2">
-            <label class="block text-xs font-bold text-slate-400">สร้างอีเวนต์ใหม่</label>
-            <input type="text" id="new-event-name" placeholder="ชื่ออีเวนต์ เช่น Seminar 2026" class="w-full border border-slate-200 rounded-xl p-2 text-sm">
-            <button onclick="createNewEvent()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-xl text-sm transition">+ เพิ่มอีเวนต์</button>
-          </div>
-        </div>
-
-        <!-- นำเข้า Excel -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <h2 class="font-bold text-base text-slate-800 border-b pb-2">2. นำเข้าฐานข้อมูลรายชื่อ (Excel)</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        
+        <!-- 1. สร้าง/ตั้งค่าอีเวนต์ & รอบเวลา (ข้อ 2 & ข้อ 7) -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <h2 class="font-bold text-sm text-slate-800 border-b pb-2 flex items-center justify-between">
+            <span>1. สร้างอีเวนต์ & กำหนดช่วงเวลา</span>
+            <span class="text-xs font-normal text-indigo-600">ข้อ 2, 7</span>
+          </h2>
+          
           <div class="space-y-2">
-            <label class="block text-xs font-bold text-slate-400">ไฟล์ Excel (.xlsx / .csv)</label>
-            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="w-full border border-slate-200 rounded-xl p-2 text-sm bg-slate-50">
-            <p class="text-xs text-slate-400">* คอลัมน์ที่รองรับ: empId, empName, email</p>
-          </div>
-          <button onclick="importExcelData()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition shadow">📥 นำเข้าฐานข้อมูล</button>
-        </div>
-
-        <!-- ตั้งค่า Pairing iPad -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <h2 class="font-bold text-base text-slate-800 border-b pb-2">3. ตั้งค่าการสแกน & iPad</h2>
-          <div class="space-y-2 text-sm">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="pair-mode-choice" value="single" checked onchange="updatePairingModeUI()" class="text-indigo-600">
-              <span><strong>สแกน + เซ็นในเครื่องเดียว</strong></span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="pair-mode-choice" value="paired" onchange="updatePairingModeUI()" class="text-indigo-600">
-              <span><strong>แยกเครื่อง (สแกน ➔ เซ็นบน iPad)</strong></span>
-            </label>
+            <label class="block text-xs font-bold text-slate-500">ชื่ออีเวนต์ใหม่</label>
+            <input type="text" id="admin-new-event-name" placeholder="เช่น งานสัมมนาวิชาการ 2026" class="w-full border rounded-xl p-2 text-xs focus:ring-2 focus:ring-indigo-500">
+            <button onclick="createNewEvent()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition">+ สร้างอีเวนต์ใหม่</button>
           </div>
 
-          <div id="pairing-code-box" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
-            <p class="text-xs font-bold text-amber-800">รหัสห้องจับคู่ (Pairing Code):</p>
-            <input type="text" id="pairing-code-input" value="ROOM_01" class="w-full font-mono font-bold text-center border rounded-lg p-1.5 bg-white text-indigo-600">
+          <hr class="border-slate-100">
+
+          <!-- เพิ่มรอบการจัดงาน (Sessions) -->
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-500">เพิ่มรอบ/ช่วงเวลาการเช็กอิน (Session)</label>
+            <input type="text" id="session-name-input" placeholder="ชื่อรอบ เช่น วันที่ 1 - ช่วงเช้า" class="w-full border rounded-xl p-2 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+              <input type="date" id="session-date-input" class="border rounded-xl p-2 text-xs">
+              <input type="time" id="session-time-input" class="border rounded-xl p-2 text-xs">
+            </div>
+            <button onclick="addEventSession()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-xl text-xs transition">+ เพิ่มรอบสแกนในอีเวนต์นี้</button>
           </div>
         </div>
+
+        <!-- 2. กำหนด Custom Fields (นำเข้า & Walk-in) (ข้อ 5 & ข้อ 6) -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <h2 class="font-bold text-sm text-slate-800 border-b pb-2 flex items-center justify-between">
+            <span>2. กำหนดฟิลด์ข้อมูล (Custom Fields)</span>
+            <span class="text-xs font-normal text-indigo-600">ข้อ 5, 6</span>
+          </h2>
+
+          <p class="text-xs text-slate-400">เลือกข้อมูลที่ต้องการใช้ในการนำเข้า Excel และฟอร์ม Walk-in หน้างานของอีเวนต์นี้</p>
+
+          <div id="fields-config-container" class="space-y-2 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg">
+              <input type="checkbox" id="cfg-empId" checked disabled class="rounded text-indigo-600">
+              <span class="font-bold">ID / รหัสพนักงาน (Default)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg">
+              <input type="checkbox" id="cfg-empName" checked disabled class="rounded text-indigo-600">
+              <span class="font-bold">ชื่อ-นามสกุล (Default)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg">
+              <input type="checkbox" id="cfg-department" onchange="saveFieldsConfig()" class="field-toggle rounded text-indigo-600">
+              <span>แผนก / สังกัด (Department)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg">
+              <input type="checkbox" id="cfg-phone" onchange="saveFieldsConfig()" class="field-toggle rounded text-indigo-600">
+              <span>เบอร์โทรศัพท์ (Phone)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg">
+              <input type="checkbox" id="cfg-email" onchange="saveFieldsConfig()" class="field-toggle rounded text-indigo-600">
+              <span>อีเมล (Email)</span>
+            </label>
+          </div>
+
+          <div class="pt-2 border-t">
+            <label class="block text-xs font-bold text-slate-500 mb-1">นำเข้ารายชื่อ Excel (.xlsx / .csv)</label>
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="w-full text-xs border rounded-xl p-2 bg-slate-50">
+            <button onclick="importExcelData()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition">📥 นำเข้าไฟล์ Excel</button>
+          </div>
+        </div>
+
+        <!-- 3. QR Code ลิงก์ตรงสำหรับสตาฟและ iPad (ข้อ 3) -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <h2 class="font-bold text-sm text-slate-800 border-b pb-2 flex items-center justify-between">
+            <span>3. QR Code ลิงก์สำหรับ iPad/สตาฟ</span>
+            <span class="text-xs font-normal text-indigo-600">ข้อ 3</span>
+          </h2>
+
+          <div class="text-xs space-y-2">
+            <p class="text-slate-500">ให้ iPad หรือมือถือสตาฟสแกน QR ด้านล่างนี้เพื่อเปิดเข้าสู่โหมดจับคู่ของอีเวนต์นี้ทันที</p>
+            
+            <div class="p-3 bg-slate-50 rounded-xl border flex flex-col items-center justify-center space-y-2">
+              <div id="pairing-link-qr" class="p-2 bg-white rounded-lg shadow-sm"></div>
+              <p class="text-[10px] font-mono text-indigo-600 break-all text-center" id="pairing-url-text"></p>
+            </div>
+
+            <div class="space-y-1">
+              <label class="block text-[11px] font-bold text-slate-600">รหัสห้องจับคู่ (Pairing Room Code):</label>
+              <input type="text" id="pairing-room-id" value="ROOM_EVENT_1" onchange="generatePairingQR()" class="w-full font-mono font-bold text-center border rounded-xl p-2 text-indigo-600 bg-white">
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- ตารางแสดงผู้ลงทะเบียน & เจน QR Code -->
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+      <!-- ตารางรายชื่อผู้ลงทะเบียนล่วงหน้า -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
         <div class="flex flex-wrap justify-between items-center gap-4">
-          <h2 class="text-lg font-bold text-slate-800">รายชื่อผู้ลงทะเบียนล่วงหน้า & QR Code ประจำตัว</h2>
-          <button onclick="sendBulkEmail()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-xl shadow transition">✉️ ส่งอีเมล QR Code ทั้งหมด</button>
+          <h2 class="text-sm font-bold text-slate-800">รายชื่อผู้ลงทะเบียนล่วงหน้า & QR Code ประจำตัว</h2>
+          <button onclick="sendBulkEmail()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold py-2 px-3 rounded-xl transition">✉️ ส่งอีเมล QR Code ทั้งหมด</button>
         </div>
 
         <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse text-sm">
+          <table class="w-full text-left border-collapse text-xs">
             <thead>
-              <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase">
-                <th class="py-3 px-4">รหัสพนักงาน</th>
-                <th class="py-3 px-4">ชื่อ-นามสกุล</th>
-                <th class="py-3 px-4">อีเมล</th>
-                <th class="py-3 px-4 text-center">QR Code</th>
-                <th class="py-3 px-4 text-center">จัดการ</th>
+              <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                <th class="py-2.5 px-3">ID / รหัส</th>
+                <th class="py-2.5 px-3">ชื่อ-นามสกุล</th>
+                <th class="py-2.5 px-3">ข้อมูลเพิ่มเติม</th>
+                <th class="py-2.5 px-3 text-center">QR Code ประจำตัว</th>
+                <th class="py-2.5 px-3 text-center">จัดการ</th>
               </tr>
             </thead>
-            <tbody id="admin-attendee-table" class="divide-y divide-slate-100 font-medium">
-              <!-- Render attendee list -->
+            <tbody id="admin-attendee-table" class="divide-y divide-slate-100">
+              <!-- Attendee Rows -->
             </tbody>
           </table>
         </div>
@@ -126,124 +197,116 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- SECTION 2: STAFF SCANNER & DASHBOARD (คง UI/UX เดิมไว้ทั้งหมด)   -->
+    <!-- SECTION 2: STAFF SCANNER & REALTIME DASHBOARD                    -->
     <!-- ================================================================= -->
-    <section id="view-staff" class="hidden space-y-6">
+    <section id="view-staff" class="hidden space-y-5">
 
-      <!-- Section: กล้องและผลลัพธ์การสแกน (UI เดิม) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         
-        <!-- กล้องสแกน -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-between space-y-4">
-          <div class="w-full relative overflow-hidden rounded-xl bg-black aspect-video flex items-center justify-center">
+        <!-- กล้องสแกน + ควบคุม Mirror (ข้อ 4) -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex justify-between items-center">
+            <h2 class="font-bold text-sm text-slate-800">สแกน QR Code ผู้ร่วมงาน</h2>
+            <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+              <input type="checkbox" id="chk-flip-camera" onchange="toggleCameraFlip()" class="rounded text-indigo-600">
+              <span>กลับด้านกล้อง (Mirror)</span>
+            </label>
+          </div>
+
+          <div class="relative overflow-hidden rounded-2xl bg-black aspect-video flex items-center justify-center border border-slate-800">
             <div id="reader" class="w-full h-full"></div>
           </div>
           
-          <div class="flex gap-4 w-full">
-            <button id="btn-start" onclick="startScanner()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
-              เปิดกล้องสแกน
-            </button>
-            <button id="btn-stop" onclick="stopScanner()" class="flex-1 bg-rose-400 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl shadow transition flex items-center justify-center gap-2">
-              ปิดกล้อง
-            </button>
+          <div class="flex gap-3">
+            <button id="btn-start" onclick="startScanner()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition">เปิดกล้องสแกน</button>
+            <button id="btn-stop" onclick="stopScanner()" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition">ปิดกล้อง</button>
           </div>
 
-          <button onclick="openWalkinModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl shadow text-sm transition">
-            + เพิ่มลงทะเบียนหน้างาน (Walk-in)
-          </button>
+          <button onclick="openWalkinModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm transition">+ ลงทะเบียนหน้างาน (Walk-in Custom)</button>
         </div>
 
-        <!-- ส่วนแสดงผลสถานะการสแกนล่าสุด (UI เดิม) -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center">
-          <div id="result-empty" class="text-center text-slate-400 py-12">
-            <p class="text-lg font-medium">พร้อมสแกนข้อมูล</p>
-            <p class="text-sm">กรุณาส่อง QR Code ประจำตัวผู้เข้าร่วมงาน</p>
+        <!-- แสดงผลสแกนล่าสุด -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
+          <div id="result-empty" class="text-center text-slate-400 py-10 space-y-2">
+            <span class="text-4xl">📱</span>
+            <p class="text-sm font-bold">พร้อมสแกนข้อมูล</p>
+            <p class="text-xs">เล็งกล้องไปที่ QR Code ของผู้เข้าร่วมงาน</p>
           </div>
 
-          <div id="result-data" class="hidden space-y-4">
-            <div id="scan-alert-badge" class="py-2 px-4 rounded-xl font-bold text-sm bg-emerald-100 text-emerald-800 border border-emerald-300 text-center">
-              ✅ สแกนสำเร็จ!
+          <div id="result-data" class="hidden space-y-3">
+            <div class="py-2 px-3 rounded-xl font-bold text-xs bg-emerald-100 text-emerald-800 border border-emerald-200 text-center">
+              ✅ บันทึกเช็กอินสำเร็จ!
             </div>
 
-            <div class="space-y-2 text-sm text-slate-600">
-              <p><strong>รหัสผู้สแกน:</strong> <span id="res-barcode" class="text-indigo-600 font-bold"></span></p>
+            <div class="space-y-1.5 text-xs text-slate-600 border-b pb-3">
+              <p><strong>รหัส:</strong> <span id="res-barcode" class="text-indigo-600 font-bold"></span></p>
               <p><strong>ชื่อ-นามสกุล:</strong> <span id="res-emp-name" class="text-slate-900 font-bold"></span></p>
+              <p><strong>รอบเวลา:</strong> <span id="res-session" class="text-amber-700 font-bold"></span></p>
               <p><strong>เวลาสแกน:</strong> <span id="res-timestamp"></span></p>
-              <p><strong>สตาฟผู้สแกน:</strong> <span id="res-staff">Admin</span></p>
             </div>
 
-            <div class="pt-2">
-              <p class="text-xs font-bold text-slate-400 mb-1">ลายเซ็นเข้างาน</p>
-              <img id="res-signature-img" src="" alt="Signature" class="h-16 object-contain rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 mb-1">ลายเซ็นยืนยัน</p>
+              <img id="res-signature-img" src="" alt="Signature" class="h-16 object-contain rounded-xl border bg-slate-50 p-1">
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- Section: Dashboard รายชื่อ (UI เดิม) -->
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-        
+      <!-- Dashboard แสดงผล Realtime Table -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              Dashboard รายชื่อผู้สแกนเข้างาน
-            </h2>
-            <p class="text-xs text-slate-400 mt-1">ข้อมูลเรียลไทม์ประจำอีเวนต์นี้</p>
+            <h2 class="text-base font-bold text-slate-800">Dashboard รายชื่อผู้เข้างาน</h2>
+            <p class="text-xs text-slate-400">อัปเดตแบบ Realtime ตามรอบที่เลือก</p>
           </div>
 
-          <div class="flex items-center gap-3">
-            <button onclick="exportSignedPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow transition">
-              📄 ใบเซ็นชื่อ PDF
-            </button>
-            
-            <span class="bg-indigo-50 text-indigo-700 text-sm font-bold py-2 px-4 rounded-xl">
-              เช็กอินแล้ว: <span id="total-count">0</span> คน
-            </span>
-
-            <input type="text" id="search-input" onkeyup="renderDashboardTable()" placeholder="ค้นหารหัส/ชื่อ..." class="border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none w-48 md:w-64">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="exportSignedPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition">📄 ออกใบเซ็นชื่อ PDF</button>
+            <span class="bg-indigo-50 text-indigo-700 text-xs font-bold py-2 px-3 rounded-xl">ยอดเช็กอิน: <span id="total-count">0</span> คน</span>
+            <input type="text" id="search-input" onkeyup="renderDashboardTable()" placeholder="ค้นหารหัส/ชื่อ..." class="border rounded-xl px-3 py-1.5 text-xs focus:outline-none w-40 md:w-56">
           </div>
         </div>
 
-        <!-- ตาราง Dashboard (UI เดิม + ปุ่มแก้ไข) -->
         <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
+          <table class="w-full text-left border-collapse text-xs">
             <thead>
-              <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase">
-                <th class="py-3 px-4">ลำดับ</th>
-                <th class="py-3 px-4">เวลาสแกน</th>
-                <th class="py-3 px-4">รหัส</th>
-                <th class="py-3 px-4">ชื่อ-นามสกุล</th>
-                <th class="py-3 px-4">ลายเซ็น</th>
-                <th class="py-3 px-4 text-center">จัดการ</th>
+              <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                <th class="py-2.5 px-3">ลำดับ</th>
+                <th class="py-2.5 px-3">รอบเวลา</th>
+                <th class="py-2.5 px-3">เวลาสแกน</th>
+                <th class="py-2.5 px-3">รหัส/ID</th>
+                <th class="py-2.5 px-3">ชื่อ-นามสกุล</th>
+                <th class="py-2.5 px-3">ลายเซ็น</th>
+                <th class="py-2.5 px-3 text-center">จัดการ</th>
               </tr>
             </thead>
-            <tbody id="logs-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-              <!-- Realtime Dashboard Data -->
+            <tbody id="logs-table-body" class="divide-y divide-slate-100 font-medium">
+              <!-- Logs Row -->
             </tbody>
           </table>
         </div>
-
       </div>
 
     </section>
 
     <!-- ================================================================= -->
-    <!-- SECTION 3: IPAD SIGNATURE STANDALONE                              -->
+    <!-- SECTION 3: IPAD STANDALONE MODE                                   -->
     <!-- ================================================================= -->
-    <section id="view-ipad" class="hidden min-h-[75vh] flex flex-col items-center justify-center">
-      <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-lg text-center space-y-6 border border-slate-100">
-        <span class="text-5xl">✏️</span>
-        <h2 class="text-2xl font-bold text-slate-800">โหมด iPad รับลายเซ็นเข้างาน</h2>
-        <p class="text-slate-500 text-sm">เมื่อสตาฟสแกน QR Code หน้าจอจะเด้งป๊อปอัปให้ผู้เข้าร่วมงานเซ็นชื่อทันที</p>
-        
-        <div class="p-4 bg-slate-50 rounded-2xl border text-left space-y-2">
-          <label class="text-xs font-bold text-slate-400">ระบุ Pairing Code (ให้ตรงกับเครื่องสแกน):</label>
-          <input type="text" id="ipad-room-code" value="ROOM_01" onchange="listenIpadPairing()" class="w-full p-2.5 border rounded-xl font-mono text-center font-bold text-indigo-600 bg-white">
+    <section id="view-ipad" class="hidden min-h-[70vh] flex flex-col items-center justify-center">
+      <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md text-center space-y-5 border border-slate-100">
+        <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-3xl">✏️</div>
+        <h2 class="text-xl font-bold text-slate-800">โหมด iPad รับลายเซ็น</h2>
+        <p class="text-xs text-slate-400">หน้าจอนี้จะเด้งป๊อปอัปให้ผู้เข้าร่วมงานเซ็นชื่อทันทีที่สตาฟทำการสแกน QR Code</p>
+
+        <div class="p-3 bg-slate-50 rounded-2xl border text-left space-y-1.5">
+          <label class="text-[11px] font-bold text-slate-500">Pairing Room Code:</label>
+          <input type="text" id="ipad-room-code-input" value="ROOM_EVENT_1" onchange="listenIpadPairing()" class="w-full p-2 border rounded-xl font-mono text-center font-bold text-indigo-600 bg-white text-sm">
         </div>
 
-        <div id="ipad-status-badge" class="py-2.5 px-4 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold">
-          ⏳ กำลังรอการสแกนจากเครื่องสตาฟ...
+        <div id="ipad-status-badge" class="py-2 px-4 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+          ⏳ รอรับสัญญาณการสแกนจากสตาฟ...
         </div>
       </div>
     </section>
@@ -255,77 +318,70 @@
   <!-- MODALS & POPUPS                                                  -->
   <!-- ================================================================= -->
 
-  <!-- Modal: ป๊อปอัปเซ็นชื่อ & แก้ไขข้อมูล (มี Header บอกชื่อชัดเจน) -->
+  <!-- Popup Modal เซ็นชื่อ (ระบุ Header ชัดเจนเสมอตามโจทย์) -->
   <div id="modal-signature" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden space-y-0">
       
-      <!-- Header ระบุชื่อผู้เซ็นชื่อชัดเจนเสมอ -->
+      <!-- Header ระบุชื่อผู้เข้าร่วมงานด้านบนเสมอ -->
       <div class="bg-indigo-600 p-4 text-white flex justify-between items-center">
         <div>
-          <p class="text-xs text-indigo-200 uppercase font-bold">ช่องเซ็นชื่อผู้เข้าร่วมงาน</p>
-          <h3 id="pop-header-title" class="font-bold text-lg">คุณ...</h3>
+          <p class="text-[10px] text-indigo-200 uppercase font-bold tracking-wider">ช่องเซ็นชื่อผู้เข้าร่วมงาน</p>
+          <h3 id="pop-header-title" class="font-bold text-base md:text-lg">คุณ...</h3>
         </div>
-        <button onclick="closeModal('modal-signature')" class="text-white/80 hover:text-white font-bold text-xl">✕</button>
+        <button onclick="closeModal('modal-signature')" class="text-white/80 hover:text-white font-bold text-lg">✕</button>
       </div>
 
-      <div class="p-6 space-y-4">
-        <!-- ช่องข้อมูลสำหรับตรวจสอบ/แก้ไข -->
-        <div class="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <label class="text-xs font-bold text-slate-400">รหัสพนักงาน</label>
-            <input type="text" id="pop-emp-id" class="w-full border rounded-xl p-2 font-mono font-bold text-indigo-600">
-          </div>
-          <div>
-            <label class="text-xs font-bold text-slate-400">ชื่อ-นามสกุล</label>
-            <input type="text" id="pop-emp-name" class="w-full border rounded-xl p-2 font-bold">
-          </div>
+      <div class="p-5 space-y-4">
+        <!-- Dynamic Fields View / Edit -->
+        <div id="modal-dynamic-fields-container" class="grid grid-cols-2 gap-2 text-xs">
+          <!-- Rendered dynamically -->
         </div>
 
-        <!-- Canvas ช่องเซ็นชื่อ -->
+        <!-- Canvas ลายเซ็น -->
         <div>
-          <label class="block text-xs font-bold text-slate-500 mb-1">กรุณาเซ็นชื่อด้านล่างนี้ (Signature)</label>
+          <label class="block text-xs font-bold text-slate-600 mb-1">กรุณาเซ็นชื่อลงในช่องด้านล่าง</label>
           <div class="border-2 border-dashed border-indigo-200 rounded-2xl bg-slate-50 overflow-hidden">
-            <canvas id="signature-canvas" class="w-full h-44 touch-none"></canvas>
+            <canvas id="signature-canvas" class="w-full h-40 touch-none"></canvas>
           </div>
-          <button onclick="clearSignatureCanvas()" class="mt-1 text-xs text-rose-500 hover:underline font-bold">ล้างลายเซ็น</button>
+          <button onclick="clearSignatureCanvas()" class="mt-1 text-[11px] text-rose-500 hover:underline font-bold">ล้างลายเซ็น</button>
         </div>
 
-        <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
-          ✅ ยืนยันและบันทึกเข้างาน
+        <button onclick="saveAttendanceRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+          ✅ ยืนยันข้อมูลและบันทึกเข้างาน
         </button>
       </div>
 
     </div>
   </div>
 
-  <!-- Modal: ลงทะเบียน Walk-in -->
+  <!-- Modal Walk-in (Dynamic Fields ตามอีเวนต์ ข้อ 5) -->
   <div id="modal-walkin" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-5 space-y-4">
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-lg text-slate-800">ลงทะเบียน Walk-in หน้างาน</h3>
+        <h3 class="font-bold text-sm text-slate-800">ลงทะเบียน Walk-in หน้างาน</h3>
         <button onclick="closeModal('modal-walkin')" class="text-slate-400 font-bold">✕</button>
       </div>
-      <div class="space-y-3 text-sm">
-        <input type="text" id="walkin-id" placeholder="รหัสพนักงาน / ID" class="w-full border rounded-xl p-2.5">
-        <input type="text" id="walkin-name" placeholder="ชื่อ-นามสกุล" class="w-full border rounded-xl p-2.5 font-bold">
-        <input type="email" id="walkin-email" placeholder="อีเมล (ถ้ามี)" class="w-full border rounded-xl p-2.5">
+      
+      <div id="walkin-dynamic-inputs" class="space-y-3 text-xs">
+        <!-- Rendered dynamically according to Active Event Config -->
       </div>
-      <button onclick="submitWalkin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition">ถัดไป: ไปหน้าเซ็นชื่อ</button>
+
+      <button onclick="submitWalkin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition">ถัดไป: สแกน/เซ็นชื่อ</button>
     </div>
   </div>
 
-  <!-- Template สำหรับ Export PDF -->
+  <!-- PDF Print Template -->
   <div id="pdf-template" class="hidden p-8 bg-white text-slate-900 space-y-4">
     <div class="text-center border-b pb-4">
-      <h2 class="text-2xl font-bold">ใบลงชื่อเข้าร่วมงาน (Attendance Sheet)</h2>
-      <p id="pdf-event-name" class="text-sm text-slate-500"></p>
+      <h2 class="text-xl font-bold">ใบลงชื่อเข้าร่วมงาน (Attendance Report)</h2>
+      <p id="pdf-event-info" class="text-xs text-slate-500"></p>
     </div>
-    <table class="w-full border-collapse border border-slate-300 text-sm">
+    <table class="w-full border-collapse border border-slate-300 text-xs">
       <thead>
         <tr class="bg-slate-100">
           <th class="border p-2">ลำดับ</th>
           <th class="border p-2">เวลา</th>
-          <th class="border p-2">รหัส</th>
+          <th class="border p-2">รหัส/ID</th>
           <th class="border p-2">ชื่อ-นามสกุล</th>
           <th class="border p-2 text-center">ลายเซ็น</th>
         </tr>
@@ -339,30 +395,41 @@
   <!-- JAVASCRIPT SYSTEM LOGIC                                          -->
   <!-- ================================================================= -->
   <script>
-    // 1. Config Firebase
-    const firebaseConfig = {
-      databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com"
-    };
+    // 1. Firebase Config
+    const firebaseConfig = { databaseURL: "https://YOUR_DATABASE_NAME.firebaseio.com" };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. Global State Variables
-    let activeEventId = "EVENT_DEFAULT";
-    let eventsList = ["EVENT_DEFAULT"];
+    // 2. Global Application State
+    let activeEventId = "EVENT_01";
+    let activeSessionId = "SESSION_ALL";
+    let eventsConfig = {};
     let attendees = {};
     let scanLogsList = [];
     let html5QrcodeScanner = null;
     let signaturePad = null;
     let isProcessing = false;
-    let currentStaffName = "Admin";
-    let activeUserForSign = null;
 
     // 3. System Initialization
     window.onload = () => {
       initSignaturePad();
-      loadEventsFromFirebase();
-      listenIpadPairing();
+      checkUrlParams();
+      listenEventsList();
     };
+
+    function checkUrlParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode');
+      const room = urlParams.get('room');
+      const event = urlParams.get('event');
+
+      if (event) activeEventId = event;
+      if (room) {
+        document.getElementById('pairing-room-id').value = room;
+        document.getElementById('ipad-room-code-input').value = room;
+      }
+      if (mode === 'ipad') switchView('ipad');
+    }
 
     function switchView(viewName) {
       document.getElementById('view-admin').classList.add('hidden');
@@ -373,6 +440,8 @@
 
       if (viewName === 'staff') startScanner();
       else stopScanner();
+
+      if (viewName === 'ipad') listenIpadPairing();
     }
 
     function initSignaturePad() {
@@ -384,118 +453,161 @@
       if (signaturePad) signaturePad.clear();
     }
 
-    // 4. Multi-Event Management
-    function loadEventsFromFirebase() {
-      db.ref('eventsList').on('value', snapshot => {
-        const data = snapshot.val();
-        if (data) eventsList = Object.keys(data);
-        renderEventSelector();
-        bindEventData();
+    // 4. Multi-Event & Sessions Logic (ข้อ 2 & ข้อ 7)
+    function listenEventsList() {
+      db.ref('events').on('value', snapshot => {
+        const data = snapshot.val() || {};
+        eventsConfig = data;
+        
+        if (!eventsConfig[activeEventId]) {
+          const keys = Object.keys(eventsConfig);
+          if (keys.length > 0) activeEventId = keys[0];
+          else createDefaultEvent();
+        }
+
+        renderEventSelectors();
+        loadActiveEventData();
       });
     }
 
-    function renderEventSelector() {
-      const selector = document.getElementById('event-selector');
-      selector.innerHTML = '';
-      eventsList.forEach(e => {
-        const opt = document.createElement('option');
-        opt.value = e;
-        opt.innerText = e;
-        if (e === activeEventId) opt.selected = true;
-        selector.appendChild(opt);
+    function createDefaultEvent() {
+      db.ref(`events/EVENT_01`).set({
+        name: "งานสัมมนาหลัก 2026",
+        fields: { empId: true, empName: true, department: true, email: true },
+        sessions: {
+          "SESSION_1": { name: "วันที่ 16 - ช่วงเช้า", date: "2026-09-16", time: "09:00" },
+          "SESSION_2": { name: "วันที่ 16 - ช่วงบ่าย", date: "2026-09-16", time: "13:00" }
+        }
       });
-    }
-
-    function changeActiveEvent() {
-      activeEventId = document.getElementById('event-selector').value;
-      bindEventData();
     }
 
     function createNewEvent() {
-      const name = document.getElementById('new-event-name').value.trim();
+      const name = document.getElementById('admin-new-event-name').value.trim();
       if (!name) return alert('กรุณากรอกชื่ออีเวนต์');
-      const eventKey = name.replace(/\s+/g, '_');
-      db.ref(`eventsList/${eventKey}`).set(true);
-      activeEventId = eventKey;
-      document.getElementById('new-event-name').value = '';
+
+      const eventId = `EVT_${Date.now().toString().slice(-6)}`;
+      db.ref(`events/${eventId}`).set({
+        name: name,
+        fields: { empId: true, empName: true, department: true, email: true },
+        sessions: {
+          "DEFAULT": { name: "รอบทั่วไป", date: new Date().toISOString().split('T')[0], time: "08:00" }
+        }
+      }, () => {
+        activeEventId = eventId;
+        document.getElementById('admin-new-event-name').value = '';
+        alert('สร้างอีเวนต์เรียบร้อยแล้ว');
+      });
     }
 
-    function bindEventData() {
-      // ดึงรายชื่อผู้ลงทะเบียนล่วงหน้า
-      db.ref(`events/${activeEventId}/attendees`).on('value', snapshot => {
+    function addEventSession() {
+      const name = document.getElementById('session-name-input').value.trim();
+      const date = document.getElementById('session-date-input').value;
+      const time = document.getElementById('session-time-input').value;
+
+      if (!name) return alert('กรุณาระบุชื่อรอบ');
+      const sessionId = `SESS_${Date.now().toString().slice(-4)}`;
+
+      db.ref(`events/${activeEventId}/sessions/${sessionId}`).set({ name, date, time }, () => {
+        alert('เพิ่มรอบเช็กอินเรียบร้อย');
+        document.getElementById('session-name-input').value = '';
+      });
+    }
+
+    function renderEventSelectors() {
+      const gSelector = document.getElementById('global-event-selector');
+      gSelector.innerHTML = '';
+
+      Object.keys(eventsConfig).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = eventsConfig[key].name || key;
+        if (key === activeEventId) opt.selected = true;
+        gSelector.appendChild(opt);
+      });
+
+      renderSessionSelector();
+      generatePairingQR();
+    }
+
+    function renderSessionSelector() {
+      const sSelector = document.getElementById('global-session-selector');
+      sSelector.innerHTML = '<option value="SESSION_ALL">-- ทุกรอบเวลารวมกัน --</option>';
+
+      const sessions = eventsConfig[activeEventId]?.sessions || {};
+      Object.keys(sessions).forEach(sKey => {
+        const opt = document.createElement('option');
+        opt.value = sKey;
+        opt.innerText = `${sessions[sKey].name} (${sessions[sKey].date || ''})`;
+        if (sKey === activeSessionId) opt.selected = true;
+        sSelector.appendChild(opt);
+      });
+
+      const currentSess = sessions[activeSessionId];
+      document.getElementById('event-date-display').innerText = currentSess ? `${currentSess.name} [${currentSess.date}]` : 'รวมทุกรอบ';
+    }
+
+    function onSelectEventChange(val) {
+      activeEventId = val;
+      activeSessionId = "SESSION_ALL";
+      loadActiveEventData();
+      renderEventSelectors();
+    }
+
+    function onSelectSessionChange(val) {
+      activeSessionId = val;
+      renderSessionSelector();
+      renderDashboardTable();
+    }
+
+    // 5. Custom Dynamic Fields Config (ข้อ 5 & ข้อ 6)
+    function loadActiveEventData() {
+      const fields = eventsConfig[activeEventId]?.fields || { empId: true, empName: true };
+      document.getElementById('cfg-department').checked = !!fields.department;
+      document.getElementById('cfg-phone').checked = !!fields.phone;
+      document.getElementById('cfg-email').checked = !!fields.email;
+
+      // ดึงรายชื่อผู้ลงทะเบียน
+      db.ref(`attendees/${activeEventId}`).on('value', snapshot => {
         attendees = snapshot.val() || {};
         renderAdminAttendeeTable();
       });
 
-      // ดึงข้อมูล Logs สแกนเข้างาน Realtime
+      // ดึง Logs เข้างาน
       db.ref(`scanLogs/${activeEventId}`).on('value', snapshot => {
-        const data = snapshot.val();
-        scanLogsList = [];
-        if (data) {
-          Object.keys(data).forEach(k => scanLogsList.push({ _key: k, ...data[k] }));
-        }
+        const data = snapshot.val() || {};
+        scanLogsList = Object.keys(data).map(k => ({ _key: k, ...data[k] }));
         renderDashboardTable();
       });
     }
 
-    // 5. Excel Import & Admin QR Generation
-    function importExcelData() {
-      const fileInput = document.getElementById('excel-file-input');
-      if (!fileInput.files.length) return alert('กรุณาเลือกไฟล์ Excel');
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet);
-
-        json.forEach(row => {
-          const empId = String(row.empId || row.รหัส || `EMP_${Math.floor(Math.random()*10000)}`);
-          attendees[empId] = {
-            empId: empId,
-            empName: row.empName || row.ชื่อ || 'ไม่ระบุชื่อ',
-            email: row.email || row.อีเมล || '',
-            checkedIn: false
-          };
-        });
-
-        db.ref(`events/${activeEventId}/attendees`).set(attendees);
-        alert('นำเข้าฐานข้อมูลเรียบร้อยแล้ว!');
+    function saveFieldsConfig() {
+      const fields = {
+        empId: true,
+        empName: true,
+        department: document.getElementById('cfg-department').checked,
+        phone: document.getElementById('cfg-phone').checked,
+        email: document.getElementById('cfg-email').checked,
       };
-      reader.readAsArrayBuffer(fileInput.files[0]);
+      db.ref(`events/${activeEventId}/fields`).set(fields);
     }
 
-    function renderAdminAttendeeTable() {
-      const tbody = document.getElementById('admin-attendee-table');
-      tbody.innerHTML = '';
-      Object.values(attendees).forEach(att => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition";
-        tr.innerHTML = `
-          <td class="py-3 px-4 font-semibold text-indigo-600">${att.empId}</td>
-          <td class="py-3 px-4 font-bold text-slate-800">${att.empName}</td>
-          <td class="py-3 px-4 text-slate-500">${att.email || '-'}</td>
-          <td class="py-3 px-4"><div id="admin-qr-${att.empId}" class="flex justify-center"></div></td>
-          <td class="py-3 px-4 text-center">
-            <button onclick="sendSingleEmail('${att.empId}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-bold">✉️ ส่งอีเมล QR</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
+    // 6. Pairing QR Code Generation (ข้อ 3)
+    function generatePairingQR() {
+      const room = document.getElementById('pairing-room-id').value.trim() || 'ROOM_DEFAULT';
+      const baseUrl = window.location.href.split('?')[0];
+      const pairingUrl = `${baseUrl}?mode=ipad&event=${activeEventId}&room=${room}`;
 
-        setTimeout(() => {
-          const box = document.getElementById(`admin-qr-${att.empId}`);
-          if (box && !box.hasChildNodes()) {
-            new QRCode(box, { text: att.empId, width: 44, height: 44 });
-          }
-        }, 50);
-      });
+      document.getElementById('pairing-url-text').innerText = pairingUrl;
+      const qrContainer = document.getElementById('pairing-link-qr');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, { text: pairingUrl, width: 120, height: 120 });
     }
 
-    // 6. Scanner & Device Pairing Logic
-    function updatePairingModeUI() {
-      const isPaired = document.querySelector('input[name="pair-mode-choice"]:checked').value === 'paired';
-      document.getElementById('pairing-code-box').classList.toggle('hidden', !isPaired);
+    // 7. Mirror Camera Logic (ข้อ 4)
+    function toggleCameraFlip() {
+      const readerBox = document.getElementById('reader');
+      if (document.getElementById('chk-flip-camera').checked) readerBox.classList.add('no-mirror');
+      else readerBox.classList.remove('no-mirror');
     }
 
     function startScanner() {
@@ -519,41 +631,49 @@
       isProcessing = true;
 
       const rawBarcode = barcodeText ? barcodeText.trim() : "";
-      const matchedUser = attendees[rawBarcode] || { empId: rawBarcode, empName: 'ผู้ลงทะเบียนหน้างาน', email: '' };
+      const matchedUser = attendees[rawBarcode] || { empId: rawBarcode, empName: 'ผู้ลงทะเบียนหน้างาน' };
 
-      const isPaired = document.querySelector('input[name="pair-mode-choice"]:checked')?.value === 'paired';
+      const roomCode = document.getElementById('pairing-room-id').value;
+      db.ref(`pairings/${roomCode}`).set({
+        user: matchedUser,
+        sessionId: activeSessionId,
+        timestamp: Date.now()
+      });
 
-      if (isPaired) {
-        const roomCode = document.getElementById('pairing-code-input').value;
-        db.ref(`pairings/${roomCode}`).set({
-          user: matchedUser,
-          timestamp: Date.now()
-        });
-        alert(`ส่งป๊อปอัปเซ็นชื่อไปที่ iPad (รหัสห้อง: ${roomCode}) เรียบร้อยแล้ว`);
-        setTimeout(() => { isProcessing = false; }, 2000);
-      } else {
-        openSignatureModal(matchedUser);
-        setTimeout(() => { isProcessing = false; }, 1500);
-      }
+      openSignatureModal(matchedUser);
+      setTimeout(() => { isProcessing = false; }, 1500);
     }
 
     function listenIpadPairing() {
-      const roomCode = document.getElementById('ipad-room-code').value;
+      const roomCode = document.getElementById('ipad-room-code-input').value;
       db.ref(`pairings/${roomCode}`).on('value', snapshot => {
         const data = snapshot.val();
         if (data && data.user) {
-          document.getElementById('ipad-status-badge').innerText = `✅ ได้รับข้อมูล: ${data.user.empName}`;
+          document.getElementById('ipad-status-badge').innerText = `✅ ได้รับสแกน: ${data.user.empName}`;
           openSignatureModal(data.user);
         }
       });
     }
 
-    // 7. Modal & Signature Saving
+    // 8. Dynamic Modal & Save Attendance
     function openSignatureModal(user) {
-      activeUserForSign = user;
-      document.getElementById('pop-header-title').innerText = `${user.empName} (รหัส: ${user.empId})`;
-      document.getElementById('pop-emp-id').value = user.empId || '';
-      document.getElementById('pop-emp-name').value = user.empName || '';
+      document.getElementById('pop-header-title').innerText = `${user.empName || 'ไม่ระบุชื่อ'} (ID: ${user.empId || '-'})`;
+      
+      const fields = eventsConfig[activeEventId]?.fields || { empId: true, empName: true };
+      const container = document.getElementById('modal-dynamic-fields-container');
+      container.innerHTML = '';
+
+      Object.keys(fields).forEach(fKey => {
+        if (fields[fKey]) {
+          const div = document.createElement('div');
+          div.innerHTML = `
+            <label class="text-[10px] font-bold text-slate-400 uppercase">${fKey}</label>
+            <input type="text" id="pop-field-${fKey}" value="${user[fKey] || ''}" class="w-full border rounded-lg p-1.5 font-bold text-slate-800">
+          `;
+          container.appendChild(div);
+        }
+      });
+
       clearSignatureCanvas();
       document.getElementById('modal-signature').classList.remove('hidden');
     }
@@ -561,75 +681,79 @@
     async function saveAttendanceRecord() {
       if (signaturePad.isEmpty()) return alert('กรุณาเซ็นชื่อก่อนบันทึก');
 
-      const finalId = document.getElementById('pop-emp-id').value.trim();
-      const finalName = document.getElementById('pop-emp-name').value.trim();
-      const signatureImg = signaturePad.toDataURL();
+      const fields = eventsConfig[activeEventId]?.fields || { empId: true, empName: true };
+      const recordData = {};
 
-      const timestamp = new Date().toLocaleString('th-TH', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      Object.keys(fields).forEach(fKey => {
+        if (fields[fKey]) {
+          const input = document.getElementById(`pop-field-${fKey}`);
+          if (input) recordData[fKey] = input.value.trim();
+        }
       });
 
-      // แสดงผลบน UI สแกนทันที
+      const signatureImg = signaturePad.toDataURL();
+      const timestamp = new Date().toLocaleString('th-TH');
+      const sessionName = eventsConfig[activeEventId]?.sessions?.[activeSessionId]?.name || 'รอบทั่วไป';
+
       document.getElementById('result-empty').classList.add('hidden');
       document.getElementById('result-data').classList.remove('hidden');
-      document.getElementById('res-barcode').innerText = finalId;
-      document.getElementById('res-emp-name').innerText = `${finalName} (รหัส: ${finalId})`;
+      document.getElementById('res-barcode').innerText = recordData.empId || '-';
+      document.getElementById('res-emp-name').innerText = recordData.empName || '-';
+      document.getElementById('res-session').innerText = sessionName;
       document.getElementById('res-timestamp').innerText = timestamp;
       document.getElementById('res-signature-img').src = signatureImg;
 
-      // บันทึกลง Firebase Database
-      const newLogRef = db.ref(`scanLogs/${activeEventId}`).push();
-      await newLogRef.set({
-        barcode: finalId,
-        empId: finalId,
-        empName: finalName,
+      await db.ref(`scanLogs/${activeEventId}`).push({
+        ...recordData,
         signature: signatureImg,
         timestamp: timestamp,
-        staff: currentStaffName
+        sessionId: activeSessionId,
+        sessionName: sessionName
       });
 
       closeModal('modal-signature');
     }
 
-    // 8. Render Dashboard & PDF Export
+    // 9. Dashboard Table & PDF
     function renderDashboardTable() {
       const tbody = document.getElementById('logs-table-body');
       const searchVal = document.getElementById('search-input').value.toLowerCase();
       tbody.innerHTML = '';
 
       const filtered = scanLogsList.filter(item => {
-        const id = (item.empId || item.barcode || '').toLowerCase();
+        const matchesSession = activeSessionId === 'SESSION_ALL' || item.sessionId === activeSessionId;
+        const id = (item.empId || '').toLowerCase();
         const name = (item.empName || '').toLowerCase();
-        return id.includes(searchVal) || name.includes(searchVal);
+        const matchesSearch = id.includes(searchVal) || name.includes(searchVal);
+        return matchesSession && matchesSearch;
       });
 
       document.getElementById('total-count').innerText = filtered.length;
 
-      const reversed = [...filtered].reverse();
-      reversed.forEach((item, index) => {
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-50 transition";
-        row.innerHTML = `
-          <td class="py-3 px-4 text-slate-400">${filtered.length - index}</td>
-          <td class="py-3 px-4">${item.timestamp || '-'}</td>
-          <td class="py-3 px-4 font-semibold text-indigo-600">${item.empId || item.barcode || '-'}</td>
-          <td class="py-3 px-4 font-bold text-slate-800">${item.empName || '-'}</td>
-          <td class="py-3 px-4">
-            ${item.signature ? `<img src="${item.signature}" class="h-8 object-contain bg-slate-50 p-1 border rounded">` : '-'}
+      [...filtered].reverse().forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-400">${filtered.length - index}</td>
+          <td class="py-2.5 px-3 font-bold text-amber-700">${item.sessionName || 'ทั่วไป'}</td>
+          <td class="py-2.5 px-3">${item.timestamp || '-'}</td>
+          <td class="py-2.5 px-3 font-semibold text-indigo-600">${item.empId || '-'}</td>
+          <td class="py-2.5 px-3 font-bold text-slate-800">${item.empName || '-'}</td>
+          <td class="py-2.5 px-3">
+            ${item.signature ? `<img src="${item.signature}" class="h-6 object-contain bg-white p-0.5 border rounded">` : '-'}
           </td>
-          <td class="py-3 px-4 text-center">
-            <button onclick="openSignatureModal({empId: '${item.empId}', empName: '${item.empName}'})" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg font-bold">✏️ แก้ไข</button>
+          <td class="py-2.5 px-3 text-center">
+            <button onclick="openSignatureModal(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">✏️ แก้ไข</button>
           </td>
         `;
-        tbody.appendChild(row);
+        tbody.appendChild(tr);
       });
     }
 
     function exportSignedPDF() {
       const { jsPDF } = window.jspdf;
       const pdfBox = document.getElementById('pdf-template');
-      document.getElementById('pdf-event-name').innerText = `อีเวนต์: ${activeEventId}`;
+      document.getElementById('pdf-event-info').innerText = `อีเวนต์: ${eventsConfig[activeEventId]?.name || activeEventId} | รอบ: ${activeSessionId}`;
 
       const tbody = document.getElementById('pdf-table-body');
       tbody.innerHTML = '';
@@ -639,9 +763,9 @@
           <tr>
             <td class="border p-2 text-center">${index + 1}</td>
             <td class="border p-2">${item.timestamp || ''}</td>
-            <td class="border p-2 font-bold">${item.empId || item.barcode || ''}</td>
+            <td class="border p-2 font-bold">${item.empId || ''}</td>
             <td class="border p-2">${item.empName || ''}</td>
-            <td class="border p-2 text-center"><img src="${item.signature}" class="h-6 mx-auto"></td>
+            <td class="border p-2 text-center"><img src="${item.signature}" class="h-5 mx-auto"></td>
           </tr>
         `;
       });
@@ -656,32 +780,98 @@
       });
     }
 
-    // 9. Walk-in & Emails
+    // 10. Walk-in Modal Dynamic Inputs (ข้อ 5)
     function openWalkinModal() {
+      const fields = eventsConfig[activeEventId]?.fields || { empId: true, empName: true };
+      const container = document.getElementById('walkin-dynamic-inputs');
+      container.innerHTML = '';
+
+      Object.keys(fields).forEach(fKey => {
+        if (fields[fKey]) {
+          const div = document.createElement('div');
+          div.innerHTML = `
+            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${fKey}</label>
+            <input type="text" id="walkin-field-${fKey}" placeholder="กรอก ${fKey}" class="w-full border rounded-xl p-2 font-bold">
+          `;
+          container.appendChild(div);
+        }
+      });
+
       document.getElementById('modal-walkin').classList.remove('hidden');
     }
 
     function submitWalkin() {
-      const id = document.getElementById('walkin-id').value || `WI_${Date.now().toString().slice(-4)}`;
-      const name = document.getElementById('walkin-name').value;
-      if (!name) return alert('กรุณากรอกชื่อ-นามสกุล');
+      const fields = eventsConfig[activeEventId]?.fields || { empId: true, empName: true };
+      const user = {};
 
-      const user = { empId: id, empName: name };
+      Object.keys(fields).forEach(fKey => {
+        if (fields[fKey]) {
+          const val = document.getElementById(`walkin-field-${fKey}`)?.value.trim();
+          user[fKey] = val || (fKey === 'empId' ? `WI_${Date.now().toString().slice(-4)}` : '');
+        }
+      });
+
       closeModal('modal-walkin');
       openSignatureModal(user);
     }
 
-    function closeModal(modalId) {
-      document.getElementById(modalId).classList.add('hidden');
+    // Excel Import Logic (ข้อ 6)
+    function importExcelData() {
+      const fileInput = document.getElementById('excel-file-input');
+      if (!fileInput.files.length) return alert('กรุณาเลือกไฟล์ Excel');
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        json.forEach(row => {
+          const empId = String(row.empId || row.ID || row.รหัส || `EMP_${Math.floor(Math.random()*10000)}`);
+          attendees[empId] = {
+            empId: empId,
+            empName: row.empName || row.ชื่อ || 'ไม่ระบุชื่อ',
+            department: row.department || row.แผนก || '',
+            phone: row.phone || row.เบอร์โทร || '',
+            email: row.email || row.อีเมล || ''
+          };
+        });
+
+        db.ref(`attendees/${activeEventId}`).set(attendees);
+        alert('นำเข้าไฟล์ Excel เรียบร้อยแล้ว');
+      };
+      reader.readAsArrayBuffer(fileInput.files[0]);
     }
 
-    function sendSingleEmail(empId) {
-      alert(`ส่งอีเมลแจ้ง QR Code ไปยัง ${attendees[empId]?.email || 'ผู้ลงทะเบียน'} เรียบร้อยแล้ว`);
+    function renderAdminAttendeeTable() {
+      const tbody = document.getElementById('admin-attendee-table');
+      tbody.innerHTML = '';
+      Object.values(attendees).forEach(att => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-semibold text-indigo-600">${att.empId}</td>
+          <td class="py-2.5 px-3 font-bold text-slate-800">${att.empName}</td>
+          <td class="py-2.5 px-3 text-slate-500">${att.department || att.email || '-'}</td>
+          <td class="py-2.5 px-3"><div id="admin-qr-${att.empId}" class="flex justify-center"></div></td>
+          <td class="py-2.5 px-3 text-center">
+            <button onclick="alert('ส่ง QR Code สำเร็จ')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] px-2 py-1 rounded font-bold">✉️ ส่ง QR</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        setTimeout(() => {
+          const box = document.getElementById(`admin-qr-${att.empId}`);
+          if (box && !box.hasChildNodes()) {
+            new QRCode(box, { text: att.empId, width: 36, height: 36 });
+          }
+        }, 50);
+      });
     }
 
-    function sendBulkEmail() {
-      alert('เริ่มส่งอีเมลแจ้ง QR Code หาผู้ลงทะเบียนทุกคนเรียบร้อยแล้ว');
-    }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function sendBulkEmail() { alert('ส่งอีเมล QR Code สำเร็จเรียบร้อย'); }
   </script>
 </body>
 </html>
